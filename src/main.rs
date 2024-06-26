@@ -2,6 +2,7 @@ use irc::client::prelude::*;
 use futures::prelude::*;
 
 mod trackers;
+use trackers::Tracker;
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
@@ -19,10 +20,18 @@ async fn main() -> Result<(), failure::Error> {
 
     let mut stream = client.stream()?;
 
+    // let x = trackers::torrentleech::TorrentleechTracker{};
+
     while let Some(message) = stream.next().await.transpose()? {
         match message.command {
             Command::PRIVMSG(p1, p2) => {
-                println!("got stuff: {} and {} (RAW: {:2X?})", p1, p2, p2.as_bytes())
+                println!("got stuff: {} and {}", p1, p2);
+                let x = trackers::torrentleech::TorrentleechTracker::parse_message(&p2);
+
+                if let Some(x) = x {
+                    println!("Got stuff: {}", x.name());
+                }
+                
             },
             other => {
                 println!("got something else: {:?}", other)

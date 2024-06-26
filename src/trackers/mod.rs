@@ -1,7 +1,9 @@
+pub mod torrentleech;
+
 pub trait Torrent {
-    fn name(&self) -> String;
+    fn name(&self) -> &str;
 }
 
 pub trait Tracker {
-    fn parse_message(msg: &str) -> dyn Torrent;
+    fn parse_message(msg: &str) -> Option<Box<dyn Torrent>>;
 }
