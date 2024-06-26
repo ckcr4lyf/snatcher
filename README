@@ -1,0 +1,10 @@
+snatcher
+===
+
+Snatcher is an IRC based torrent downloader
+
+GOALS
+- Be an automatic torrent downloader for my personal use
+
+NON-GOALS
+- Be a generic replacement for autodl+irssi intended for public use
