@@ -28,7 +28,7 @@ async fn main() -> Result<(), failure::Error> {
     while let Some(message) = stream.next().await.transpose()? {
         match message.command {
             Command::PRIVMSG(p1, p2) => {
-                let x = tl.parse_message(&p2);
+                let x = tl.parse_message(&p2).await;
 
                 if let Some(x) = x {
                     println!("Got new release: {:?}", x);

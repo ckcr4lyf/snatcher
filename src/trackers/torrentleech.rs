@@ -1,3 +1,5 @@
+use std::{env::temp_dir, io::Write};
+
 pub struct TorrentleechTracker {
     rss_key: String,
 }
@@ -29,7 +31,7 @@ impl super::Torrent for TorrentleechTorrent {
 impl super::Tracker for TorrentleechTracker {
     type Torrent = TorrentleechTorrent;
 
-    fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
+    async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
         // println!("Going ot par")
         let name_start_index = msg.find("Name:'")?;
         let name_end_index = msg.find("' uploaded by '")?;
@@ -49,6 +51,31 @@ impl super::Tracker for TorrentleechTracker {
 
         let id_index = url.rfind("/")?;
         let id: String = url[id_index+1..].to_owned();
+
+        let download_url = format!("https://www.torrentleech.org/rss/download/{}/{}/{}.torrent", id, self.rss_key, name_dot);
+        println!("Download url is {}", download_url);
+
+        let res = reqwest::get(download_url).await;
+
+        match res {
+            Ok(v) => {
+                println!("Got HTTP {}", v.status());
+                let p = temp_dir().as_path().join(format!("{}.torrent", name_dot));
+                let mut f = std::fs::File::create(p).unwrap();
+                match f.write_all(&v.bytes().await.unwrap()) {
+                    Ok(_) => {
+                        println!("wrote to file {}", name_dot)
+                    },
+                    Err(e) => {
+                        println!("fail to write to file.")
+                    }
+                }
+            },
+            Err(e) => {
+                println!("Got error {}", e);
+            }
+        }
+        // TODO: use reqwest
 
         Some(TorrentleechTorrent{
             name: name_dot,

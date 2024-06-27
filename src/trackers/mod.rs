@@ -8,5 +8,5 @@ pub trait Torrent: std::fmt::Debug {
 pub trait Tracker {
     type Torrent: Torrent;
 
-    fn parse_message(&self, msg: &str) -> Option<Self::Torrent>;
+    async fn parse_message(&self, msg: &str) -> Option<Self::Torrent>;
 }
