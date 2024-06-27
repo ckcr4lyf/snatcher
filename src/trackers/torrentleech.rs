@@ -1,5 +1,9 @@
 use std::{env::temp_dir, io::Write};
 
+use serde_bencode::de;
+
+use crate::torrent;
+
 pub struct TorrentleechTracker {
     rss_key: String,
 }
@@ -62,7 +66,18 @@ impl super::Tracker for TorrentleechTracker {
                 println!("Got HTTP {}", v.status());
                 let p = temp_dir().as_path().join(format!("{}.torrent", name_dot));
                 let mut f = std::fs::File::create(p).unwrap();
-                match f.write_all(&v.bytes().await.unwrap()) {
+
+                let bytes = v.bytes().await.unwrap();
+
+                match de::from_bytes::<torrent::Torrent>(&bytes) {
+                    Ok(t) => {
+                        println!("[SIZE = {}] Got {:?}", t.size(), t)
+                    },
+                    Err(e) => {
+                        println!("Fucked {}", e)
+                    }
+                }
+                match f.write_all(&bytes) {
                     Ok(_) => {
                         println!("wrote to file {}", name_dot)
                     },

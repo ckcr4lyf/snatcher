@@ -5,6 +5,7 @@ use futures::prelude::*;
 
 mod trackers;
 use trackers::Tracker;
+mod torrent;
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
