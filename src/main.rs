@@ -1,3 +1,5 @@
+use std::env;
+
 use irc::client::prelude::*;
 use futures::prelude::*;
 
@@ -21,11 +23,12 @@ async fn main() -> Result<(), failure::Error> {
     let mut stream = client.stream()?;
 
     // let x = trackers::torrentleech::TorrentleechTracker{};
+    let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
 
     while let Some(message) = stream.next().await.transpose()? {
         match message.command {
             Command::PRIVMSG(p1, p2) => {
-                let x = trackers::torrentleech::TorrentleechTracker::parse_message(&p2);
+                let x = tl.parse_message(&p2);
 
                 if let Some(x) = x {
                     println!("Got new release: {:?}", x);
