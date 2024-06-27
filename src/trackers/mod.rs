@@ -6,5 +6,7 @@ pub trait Torrent: std::fmt::Debug {
 }
 
 pub trait Tracker {
-    fn parse_message(msg: &str) -> Option<Box<dyn Torrent>>;
+    type Torrent: Torrent;
+
+    fn parse_message(msg: &str) -> Option<Self::Torrent>;
 }

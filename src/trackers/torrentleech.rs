@@ -18,7 +18,9 @@ impl super::Torrent for TorrentleechTorrent {
 
 
 impl super::Tracker for TorrentleechTracker {
-    fn parse_message(msg: &str) -> Option<Box<dyn super::Torrent>> {
+    type Torrent = TorrentleechTorrent;
+
+    fn parse_message(msg: &str) -> Option<Self::Torrent> {
         // println!("Going ot par")
         let name_start_index = msg.find("Name:'")?;
         let name_end_index = msg.find("' uploaded by '")?;
@@ -32,11 +34,11 @@ impl super::Tracker for TorrentleechTracker {
             }
         };
 
-        Some(Box::new(TorrentleechTorrent{
+        Some(TorrentleechTorrent{
             name: msg[name_start_index+6..name_end_index].to_owned(),
             uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
             url: msg[uploader_end_index+lenn..].to_owned(),
             freeleech: freeleech,
-        }))
+        })
     }
 }
