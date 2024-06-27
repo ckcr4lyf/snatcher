@@ -25,19 +25,18 @@ async fn main() -> Result<(), failure::Error> {
     while let Some(message) = stream.next().await.transpose()? {
         match message.command {
             Command::PRIVMSG(p1, p2) => {
-                println!("got stuff: {} and {}", p1, p2);
                 let x = trackers::torrentleech::TorrentleechTracker::parse_message(&p2);
 
                 if let Some(x) = x {
-                    println!("Got stuff: {}", x.name());
+                    println!("Got new release: {:?}", x);
+                } else {
+                    println!("Failed to parse {}", p2);
                 }
-                
             },
             other => {
-                println!("got something else: {:?}", other)
+                // println!("got something else: {:?}", other)
             }
         }
-        // print!("{}", message.co);
     }
 
     Ok(())
