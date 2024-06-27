@@ -1,7 +1,8 @@
 pub mod torrentleech;
 
-pub trait Torrent {
+pub trait Torrent: std::fmt::Debug {
     fn name(&self) -> &str;
+
 }
 
 pub trait Tracker {
