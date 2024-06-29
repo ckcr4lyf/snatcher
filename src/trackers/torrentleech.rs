@@ -37,7 +37,8 @@ impl super::Tracker for TorrentleechTracker {
     type Torrent = TorrentleechTorrent;
 
     async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
-        // println!("Going ot par")
+        trace!("parse_message for {}", msg);
+
         let name_start_index = msg.find("Name:'")?;
         let name_end_index = msg.find("' uploaded by '")?;
         let (uploader_end_index, freeleech, lenn) = match msg.find("' - ") {
@@ -58,32 +59,38 @@ impl super::Tracker for TorrentleechTracker {
         let id: String = url[id_index+1..].to_owned();
 
         let download_url = format!("https://www.torrentleech.org/rss/download/{}/{}/{}.torrent", id, self.rss_key, name_dot);
-        trace!("Download url is {}", download_url);
 
+        trace!("Going to download torrent from {}", download_url);
         let res = reqwest::get(download_url).await;
 
         match res {
             Ok(v) => {
-                println!("Got HTTP {}", v.status());
-                let p = temp_dir().as_path().join(format!("{}.torrent", name_dot));
-                let mut f = std::fs::File::create(p).unwrap();
-
+                trace!("Got HTTP {} from TL", v.status());
                 let bytes = v.bytes().await.unwrap();
 
+                // Try and parse torrent
+                trace!("Going to bencode-decode torrent");
                 match de::from_bytes::<torrent::Torrent>(&bytes) {
                     Ok(t) => {
-                        trace!("[SIZE = {}] Got {:?}", t.size(), t)
+                        debug!("Parsed torrent, got {:?}", t);
                     },
                     Err(e) => {
-                        error!("Fucked {}", e)
+                        error!("Error bencode-decoding torrent: {}", e);
+                        return None;
                     }
                 }
+
+                // TODO: Only download torrent if match filters?
+                let filename = format!("{}.torrent", name_dot);
+                let p = temp_dir().as_path().join(&filename);
+                let mut f = std::fs::File::create(p).unwrap();
+                
                 match f.write_all(&bytes) {
                     Ok(_) => {
-                        debug!("wrote to file {}", name_dot)
+                        debug!("wrote to file {}", filename);
                     },
                     Err(e) => {
-                        error!("fail to write to file.")
+                        error!("fail to write to file; {}", e);
                     }
                 }
             },
@@ -91,7 +98,6 @@ impl super::Tracker for TorrentleechTracker {
                 error!("Got error {}", e);
             }
         }
-        // TODO: use reqwest
 
         Some(TorrentleechTorrent{
             name: name_dot,
