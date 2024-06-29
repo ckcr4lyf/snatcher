@@ -39,8 +39,15 @@ async fn main() -> Result<(), failure::Error> {
                 if let Some(x) = x {
                     debug!("Got new release: {:?}", x);
 
-                    if x.size() < (1 << 30) {
-                        debug!("Size is less than 1GiB ({}), adding...", x.size());
+                    // At this step, should apply the filtering rules?
+
+                    // Then call .download()
+                    // For some trackers (like TL), it will be no-op since part of parse_msg (to get size)
+                    // For others, it will only then trigger the DL
+
+                    // Optimization: For TL, write to disk after calling `.download()`? (keep in memory before that)
+                    if x.size() < ((1 << 30) * 4) {
+                        debug!("Size is less than 4GiB ({}), adding...", x.size());
                         add_to_qbit(x);
                     } else {
                         debug!("Size is too large, skipping... ({})", x.size());
