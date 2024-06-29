@@ -4,11 +4,13 @@ use irc::client::prelude::*;
 use futures::prelude::*;
 
 mod trackers;
+use log::{debug, error, info};
 use trackers::Tracker;
 mod torrent;
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
+    env_logger::init();
     // We can also load the Config at runtime via Config::load("path/to/config.toml")
     let config = Config {
         nickname: Some("snatcherdev_bot".to_owned()),
@@ -26,15 +28,16 @@ async fn main() -> Result<(), failure::Error> {
     // let x = trackers::torrentleech::TorrentleechTracker{};
     let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
 
+    info!("Connecting to IRC...");
+
     while let Some(message) = stream.next().await.transpose()? {
         match message.command {
             Command::PRIVMSG(p1, p2) => {
                 let x = tl.parse_message(&p2).await;
-
                 if let Some(x) = x {
-                    println!("Got new release: {:?}", x);
+                    debug!("Got new release: {:?}", x);
                 } else {
-                    println!("Failed to parse {}", p2);
+                    error!("Failed to parse message: {}", p2);
                 }
             },
             other => {

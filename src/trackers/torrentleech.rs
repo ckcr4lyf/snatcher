@@ -1,5 +1,6 @@
 use std::{env::temp_dir, io::Write};
 
+use log::{debug, error, trace};
 use serde_bencode::de;
 
 use crate::torrent;
@@ -57,7 +58,7 @@ impl super::Tracker for TorrentleechTracker {
         let id: String = url[id_index+1..].to_owned();
 
         let download_url = format!("https://www.torrentleech.org/rss/download/{}/{}/{}.torrent", id, self.rss_key, name_dot);
-        println!("Download url is {}", download_url);
+        trace!("Download url is {}", download_url);
 
         let res = reqwest::get(download_url).await;
 
@@ -71,23 +72,23 @@ impl super::Tracker for TorrentleechTracker {
 
                 match de::from_bytes::<torrent::Torrent>(&bytes) {
                     Ok(t) => {
-                        println!("[SIZE = {}] Got {:?}", t.size(), t)
+                        trace!("[SIZE = {}] Got {:?}", t.size(), t)
                     },
                     Err(e) => {
-                        println!("Fucked {}", e)
+                        error!("Fucked {}", e)
                     }
                 }
                 match f.write_all(&bytes) {
                     Ok(_) => {
-                        println!("wrote to file {}", name_dot)
+                        debug!("wrote to file {}", name_dot)
                     },
                     Err(e) => {
-                        println!("fail to write to file.")
+                        error!("fail to write to file.")
                     }
                 }
             },
             Err(e) => {
-                println!("Got error {}", e);
+                error!("Got error {}", e);
             }
         }
         // TODO: use reqwest
