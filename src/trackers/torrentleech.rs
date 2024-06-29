@@ -73,53 +73,52 @@ impl super::Tracker for TorrentleechTracker {
         trace!("Going to download torrent from {}", download_url);
         let res = reqwest::get(download_url).await;
 
-        match res {
-            Ok(v) => {
-                trace!("Got HTTP {} from TL", v.status());
-                let bytes = v.bytes().await.unwrap();
+        let response = match res {
+            Ok(v) => v,
+            Err(e) => {
+                error!("Got error from HTTP request: {}", e);
+                return None;
+            }
+        };
 
-                // Try and parse torrent
-                trace!("Going to bencode-decode torrent");
-                let t = match de::from_bytes::<torrent::Torrent>(&bytes) {
-                    Ok(t) => {
-                        debug!("Parsed torrent, got {:?}", t);
-                        t
-                    },
-                    Err(e) => {
-                        error!("Error bencode-decoding torrent: {}", e);
-                        return None;
-                    }
-                };
+        trace!("Got HTTP {} from TL", response.status());
+        let bytes = response.bytes().await.unwrap();
 
-                // TODO: Only download torrent if match filters?
-                let filename = format!("{}.torrent", name_dot);
-                let p = temp_dir().as_path().join(&filename);
-                let mut f = std::fs::File::create(&p).unwrap();
-                
-                match f.write_all(&bytes) {
-                    Ok(_) => {
-                        debug!("wrote to file {}", filename);
-
-                        return Some(TorrentleechTorrent{
-                            name: name_dot,
-                            uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
-                            url,
-                            freeleech,
-                            id,
-                            path: p.into(),
-                            size: t.size(),
-                        })
-                    },
-                    Err(e) => {
-                        error!("fail to write to file; {}", e);
-                    }
-                }
+        // Try and parse torrent
+        trace!("Going to bencode-decode torrent");
+        let t = match de::from_bytes::<torrent::Torrent>(&bytes) {
+            Ok(t) => {
+                trace!("Parsed torrent, got {:?}", t);
+                t
             },
             Err(e) => {
-                error!("Got error {}", e);
+                error!("Error bencode-decoding torrent: {}", e);
+                return None;
+            }
+        };
+
+        // TODO: Only download torrent if match filters?
+        let filename = format!("{}.torrent", name_dot);
+        let p = temp_dir().as_path().join(&filename);
+        let mut f = std::fs::File::create(&p).unwrap();
+        
+        match f.write_all(&bytes) {
+            Ok(_) => {
+                debug!("wrote to file {}", filename);
+                Some(TorrentleechTorrent{
+                    name: name_dot,
+                    uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
+                    url,
+                    freeleech,
+                    id,
+                    path: p.into(),
+                    size: t.size(),
+                })
+            },
+            Err(e) => {
+                error!("fail to write to file; {}", e);
+                None
             }
         }
-
-        None
     }
 }
