@@ -7,6 +7,7 @@ mod trackers;
 use log::{debug, error, info};
 use trackers::Tracker;
 mod torrent;
+mod action;
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {

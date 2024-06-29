@@ -1,8 +1,11 @@
+use std::ffi::OsStr;
+
 pub mod torrentleech;
 
 pub trait Torrent: std::fmt::Debug {
     fn name(&self) -> &str;
-
+    fn path(&self) -> &OsStr;
+    fn size(&self) -> i64;
 }
 
 pub trait Tracker {
