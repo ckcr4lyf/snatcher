@@ -42,6 +42,8 @@ async fn main() -> Result<(), failure::Error> {
                     if x.size() < (1 << 30) {
                         debug!("Size is less than 1GiB ({}), adding...", x.size());
                         add_to_qbit(x);
+                    } else {
+                        debug!("Size is too large, skipping... ({})", x.size());
                     }
                 } else {
                     error!("Failed to parse message: {}", p2);
