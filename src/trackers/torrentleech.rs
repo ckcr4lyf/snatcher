@@ -1,9 +1,11 @@
 use std::{env::temp_dir, ffi::{OsStr, OsString}, io::Write};
 
-use log::{debug, error, trace};
+use futures::StreamExt;
+use irc::{client::{data::Config, Client}, proto::Command};
+use log::{debug, error, info, trace};
 use serde_bencode::de;
 
-use crate::torrent;
+use crate::{action::add_to_qbit, torrent, trackers::Torrent};
 
 pub struct TorrentleechTracker {
     rss_key: String,
@@ -120,5 +122,57 @@ impl super::Tracker for TorrentleechTracker {
                 None
             }
         }
+    }
+
+    async fn monitor(&self) -> Result<(), failure::Error> {
+        let config = Config {
+            nickname: Some("snatcherdev_bot".to_owned()),
+            server: Some("irc.torrentleech.org".to_owned()),
+            port: Some(7021),
+            channels: vec!["#tlannounces".to_owned()],
+            ..Config::default()
+        };
+    
+        let mut client = Client::from_config(config).await?;
+        client.identify()?;
+    
+        let mut stream = client.stream()?;
+    
+        // let x = trackers::torrentleech::TorrentleechTracker{};
+        // let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
+    
+        info!("Connecting to IRC...");
+    
+        while let Some(message) = stream.next().await.transpose()? {
+            match message.command {
+                Command::PRIVMSG(p1, p2) => {
+                    let x = self.parse_message(&p2).await;
+                    if let Some(x) = x {
+                        debug!("Got new release: {:?}", x);
+    
+                        // At this step, should apply the filtering rules?
+    
+                        // Then call .download()
+                        // For some trackers (like TL), it will be no-op since part of parse_msg (to get size)
+                        // For others, it will only then trigger the DL
+    
+                        // Optimization: For TL, write to disk after calling `.download()`? (keep in memory before that)
+                        if x.size() < ((1 << 30) * 4) {
+                            debug!("Size is less than 4GiB ({}), adding...", x.size());
+                            add_to_qbit(x);
+                        } else {
+                            debug!("Size is too large, skipping... ({})", x.size());
+                        }
+                    } else {
+                        error!("Failed to parse message: {}", p2);
+                    }
+                },
+                other => {
+                    // println!("got something else: {:?}", other)
+                }
+            }
+        }
+    
+        Ok(())
     }
 }
