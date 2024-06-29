@@ -1,11 +1,12 @@
 use std::env;
 
+use action::add_to_qbit;
 use irc::client::prelude::*;
 use futures::prelude::*;
 
 mod trackers;
 use log::{debug, error, info};
-use trackers::Tracker;
+use trackers::{Torrent, Tracker};
 mod torrent;
 mod action;
 
@@ -37,6 +38,11 @@ async fn main() -> Result<(), failure::Error> {
                 let x = tl.parse_message(&p2).await;
                 if let Some(x) = x {
                     debug!("Got new release: {:?}", x);
+
+                    if x.size() < (1 << 30) {
+                        debug!("Size is less than 1GiB ({}), adding...", x.size());
+                        add_to_qbit(x);
+                    }
                 } else {
                     error!("Failed to parse message: {}", p2);
                 }
