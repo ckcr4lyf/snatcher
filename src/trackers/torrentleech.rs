@@ -158,7 +158,7 @@ impl super::Tracker for TorrentleechTracker {
                         // Optimization: For TL, write to disk after calling `.download()`? (keep in memory before that)
                         if x.size() < ((1 << 30) * 4) {
                             debug!("Size is less than 4GiB ({}), adding...", x.size());
-                            add_to_qbit(x);
+                            // add_to_qbit(x);
                         } else {
                             debug!("Size is too large, skipping... ({})", x.size());
                         }

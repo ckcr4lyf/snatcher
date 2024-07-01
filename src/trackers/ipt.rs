@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use irc::client::{data::Config, Client};
+use irc::{client::{data::Config, Client}, proto::Command};
 use log::{debug, info};
 
 pub struct IptTracker {
@@ -56,7 +56,15 @@ impl super::Tracker for IptTracker {
         info!("Connected");
 
         while let Some(message) = stream.next().await.transpose()? {
-            debug!("Got message: {}", message);
+            match message.command {
+                Command::PRIVMSG(_, p2) => {
+                    // TODO: Parse
+                    debug!("Received announce: {}", p2);
+                },
+                _ => {
+                    // noop
+                }
+            }
         }
 
         Ok(())
