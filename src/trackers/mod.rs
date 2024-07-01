@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 
 pub mod torrentleech;
+pub mod ipt;
 
 pub trait Torrent: std::fmt::Debug {
     fn name(&self) -> &str;
