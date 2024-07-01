@@ -45,14 +45,15 @@ impl super::Tracker for IptTracker {
             server: Some("irc.iptorrents.com".to_owned()),
             port: Some(6667),
             channels: vec!["#ipt.announce".to_owned()],
+            use_tls: Some(false),
             ..Config::default()
         };
 
         info!("Connecting to IRC...");
-
         let mut client = Client::from_config(config).await?;
         client.identify()?;
         let mut stream = client.stream()?;
+        info!("Connected");
 
         while let Some(message) = stream.next().await.transpose()? {
             debug!("Got message: {}", message);

@@ -132,16 +132,15 @@ impl super::Tracker for TorrentleechTracker {
             channels: vec!["#tlannounces".to_owned()],
             ..Config::default()
         };
-    
+
+        info!("Connecting to IRC...");    
         let mut client = Client::from_config(config).await?;
         client.identify()?;
-    
         let mut stream = client.stream()?;
-    
+        info!("Connected");
         // let x = trackers::torrentleech::TorrentleechTracker{};
         // let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
     
-        info!("Connecting to IRC...");
     
         while let Some(message) = stream.next().await.transpose()? {
             match message.command {

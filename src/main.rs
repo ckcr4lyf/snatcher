@@ -17,8 +17,16 @@ async fn main() -> Result<(), failure::Error> {
     // We can also load the Config at runtime via Config::load("path/to/config.toml")
 
     let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
+    let ipt = trackers::ipt::IptTracker::new();
 
-    join!(tl.monitor());
+    let tl_t = tokio::spawn(async move {
+        tl.monitor().await;
+    });
+    let ipt_t = tokio::spawn(async move {
+        ipt.monitor().await;
+    });
+
+    join!(tl_t, ipt_t);
 
     Ok(())
 }
