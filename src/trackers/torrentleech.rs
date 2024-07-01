@@ -49,7 +49,7 @@ impl super::Tracker for TorrentleechTracker {
     type Torrent = TorrentleechTorrent;
 
     async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
-        trace!("parse_message for {}", msg);
+        trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
 
         let name_start_index = msg.find("Name:'")?;
         let name_end_index = msg.find("' uploaded by '")?;
