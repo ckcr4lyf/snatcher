@@ -17,3 +17,40 @@ impl Filter {
         return true;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct DummyTorrent {
+        size: i64,
+    }
+
+    impl trackers::Torrent for DummyTorrent {
+        fn size(&self) -> i64 {
+            return self.size;
+        }
+
+        fn name(&self) -> &str {
+            unimplemented!()
+        }
+
+        fn path(&self) -> &std::ffi::OsStr {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn check(){
+        let filter = Filter{
+            size_max: 4000,
+        };
+        
+        let dummy = DummyTorrent{
+            size: 100
+        };
+
+        assert_eq!(filter.check(dummy), true);
+    }
+}
