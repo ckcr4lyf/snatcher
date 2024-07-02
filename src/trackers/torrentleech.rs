@@ -26,7 +26,8 @@ pub struct TorrentleechTorrent {
     url: String,
     freeleech: bool,
     id: String,
-    path: OsString,
+    raw_torrent: Vec<u8>,
+    // path: OsString,
     size: i64,
 }
 
@@ -36,11 +37,29 @@ impl super::Torrent for TorrentleechTorrent {
     }
 
     fn path(&self) -> &OsStr {
-        return &self.path;
+        todo!()
+        // return &self.path;
     }
 
     fn size(&self) -> i64 {
         return self.size
+    }
+
+    async fn download(&self) -> Result<OsString, failure::Error> {
+        let filename = format!("{}.torrent", self.name);
+        let p = temp_dir().as_path().join(&filename);
+        let mut f = std::fs::File::create(&p).unwrap();
+        
+        match f.write_all(&self.raw_torrent) {
+            Ok(_) => {
+                debug!("wrote to file {}", filename);
+                return Ok(p.into_os_string());
+            },
+            Err(e) => {
+                error!("fail to write to file; {}", e);
+                return Err(e.into());
+            }
+        }
     }
 }
 
@@ -99,30 +118,19 @@ impl super::Tracker for TorrentleechTracker {
             }
         };
 
-        // TODO: Only download torrent if match filters?
-        let filename = format!("{}.torrent", name_dot);
-        let p = temp_dir().as_path().join(&filename);
-        let mut f = std::fs::File::create(&p).unwrap();
-        
-        match f.write_all(&bytes) {
-            Ok(_) => {
-                debug!("wrote to file {}", filename);
-                Some(TorrentleechTorrent{
-                    name: name_dot,
-                    uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
-                    url,
-                    freeleech,
-                    id,
-                    path: p.into(),
-                    size: t.size(),
-                })
-            },
-            Err(e) => {
-                error!("fail to write to file; {}", e);
-                None
-            }
-        }
+        return Some(TorrentleechTorrent{
+            name: name_dot,
+            uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
+            url,
+            freeleech,
+            id,
+            raw_torrent: bytes.to_vec(),
+            // path: p.into(),
+            size: t.size(),
+        });
     }
+
+
 
     async fn monitor(&self) -> Result<(), failure::Error> {
         let config = Config {

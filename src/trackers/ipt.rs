@@ -25,6 +25,10 @@ impl super::Torrent for IptTorrent {
     fn size(&self) -> i64 {
         todo!()
     }
+
+    async fn download(&self) -> Result<std::ffi::OsString, failure::Error> {
+        todo!()
+    }
 }
 
 impl IptTracker {
