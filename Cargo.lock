@@ -1264,6 +1264,7 @@ dependencies = [
  "futures",
  "irc",
  "log",
+ "regex",
  "reqwest",
  "serde",
  "serde_bencode",
