@@ -10,6 +10,7 @@ use tokio::join;
 use trackers::{Torrent, Tracker};
 mod torrent;
 mod action;
+mod filters;
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
