@@ -44,13 +44,18 @@ impl super::Torrent for TorrentleechTorrent {
     fn size(&self) -> i64 {
         return self.size
     }
+}
 
-    async fn download(&self) -> Result<OsString, failure::Error> {
-        let filename = format!("{}.torrent", self.name);
+
+impl super::Tracker for TorrentleechTracker {
+    type Torrent = TorrentleechTorrent;
+
+    async fn download(&self, torrent: Self::Torrent) -> Result<OsString, failure::Error> {
+        let filename = format!("{}.torrent", &torrent.name);
         let p = temp_dir().as_path().join(&filename);
         let mut f = std::fs::File::create(&p).unwrap();
         
-        match f.write_all(&self.raw_torrent) {
+        match f.write_all(&torrent.raw_torrent) {
             Ok(_) => {
                 debug!("wrote to file {}", filename);
                 return Ok(p.into_os_string());
@@ -61,11 +66,6 @@ impl super::Torrent for TorrentleechTorrent {
             }
         }
     }
-}
-
-
-impl super::Tracker for TorrentleechTracker {
-    type Torrent = TorrentleechTorrent;
 
     async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
         trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());

@@ -25,10 +25,6 @@ impl super::Torrent for IptTorrent {
     fn size(&self) -> i64 {
         todo!()
     }
-
-    async fn download(&self) -> Result<std::ffi::OsString, failure::Error> {
-        todo!()
-    }
 }
 
 impl IptTracker {
@@ -61,7 +57,7 @@ impl super::Tracker for IptTracker {
         };
 
         let size_index = https_index + msg[https_index..].find(" ")? + 5;
-        let name = msg[name_start_index..name_end_index].to_owned();
+        let name = msg[name_start_index..name_end_index].to_owned(); // This is name WITH spaces
         let torrent_id = msg[https_index+42..size_index-5].to_owned();
         let size = msg[size_index..].to_owned();
 
@@ -71,6 +67,10 @@ impl super::Tracker for IptTracker {
             freeleech,
             size,
         })
+    }
+
+    async fn download(&self, torrent: Self::Torrent) -> Result<std::ffi::OsString, failure::Error> {
+        todo!()
     }
 
     async fn monitor(&self) -> Result<(), failure::Error> {
