@@ -1,9 +1,11 @@
+use std::{env::temp_dir, fmt::format, io::Write};
+
 use futures::StreamExt;
 use irc::{client::{data::Config, Client}, proto::Command};
 use log::{debug, error, info, trace};
 
 pub struct IptTracker {
-
+    passkey: String,
 }
 #[derive(Debug)]
 pub struct IptTorrent {
@@ -28,9 +30,9 @@ impl super::Torrent for IptTorrent {
 }
 
 impl IptTracker {
-    pub fn new() -> Self {
+    pub fn new(passkey: &str) -> Self {
         IptTracker{
-        
+            passkey: passkey.to_owned(),
         }
     }
 }
@@ -70,7 +72,37 @@ impl super::Tracker for IptTracker {
     }
 
     async fn download(&self, torrent: Self::Torrent) -> Result<std::ffi::OsString, failure::Error> {
-        todo!()
+        let download_url = format!("https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}", torrent.id, torrent.name, self.passkey);
+
+        trace!("Going to download torrent from {}", download_url);
+        let res = reqwest::get(download_url).await;
+
+        let response = match res {
+            Ok(v) => v,
+            Err(e) => {
+                error!("Got error from HTTP request: {}", e);
+                return Err(e.into());
+            }
+        };
+
+        trace!("Got HTTP {} from IPT", response.status());
+        let bytes = response.bytes().await.unwrap();
+
+        // No need to bencode-decode here...
+        let filename = format!("{}.torrent", torrent.name);
+        let p = temp_dir().as_path().join(&filename);
+        let mut f = std::fs::File::create(&p).unwrap();
+        
+        match f.write_all(&bytes) {
+            Ok(_) => {
+                debug!("wrote to file {}", filename);
+                return Ok(p.into_os_string());
+            },
+            Err(e) => {
+                error!("fail to write to file; {}", e);
+                return Err(e.into());
+            }
+        }
     }
 
     async fn monitor(&self) -> Result<(), failure::Error> {
