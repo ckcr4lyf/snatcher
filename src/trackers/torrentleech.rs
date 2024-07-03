@@ -132,7 +132,7 @@ impl super::Tracker for TorrentleechTracker {
 
 
 
-    async fn monitor(&self, filter: filters::Filter) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: &filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.torrentleech.org".to_owned()),
