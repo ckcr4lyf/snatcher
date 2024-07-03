@@ -26,7 +26,8 @@ pub struct TorrentleechTorrent {
     url: String,
     freeleech: bool,
     id: String,
-    path: OsString,
+    raw_torrent: Vec<u8>,
+    // path: OsString,
     size: i64,
 }
 
@@ -36,7 +37,8 @@ impl super::Torrent for TorrentleechTorrent {
     }
 
     fn path(&self) -> &OsStr {
-        return &self.path;
+        todo!()
+        // return &self.path;
     }
 
     fn size(&self) -> i64 {
@@ -48,8 +50,25 @@ impl super::Torrent for TorrentleechTorrent {
 impl super::Tracker for TorrentleechTracker {
     type Torrent = TorrentleechTorrent;
 
+    async fn download(&self, torrent: Self::Torrent) -> Result<OsString, failure::Error> {
+        let filename = format!("{}.torrent", &torrent.name);
+        let p = temp_dir().as_path().join(&filename);
+        let mut f = std::fs::File::create(&p).unwrap();
+        
+        match f.write_all(&torrent.raw_torrent) {
+            Ok(_) => {
+                debug!("wrote to file {}", filename);
+                return Ok(p.into_os_string());
+            },
+            Err(e) => {
+                error!("fail to write to file; {}", e);
+                return Err(e.into());
+            }
+        }
+    }
+
     async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
-        trace!("parse_message for {}", msg);
+        trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
 
         let name_start_index = msg.find("Name:'")?;
         let name_end_index = msg.find("' uploaded by '")?;
@@ -99,30 +118,19 @@ impl super::Tracker for TorrentleechTracker {
             }
         };
 
-        // TODO: Only download torrent if match filters?
-        let filename = format!("{}.torrent", name_dot);
-        let p = temp_dir().as_path().join(&filename);
-        let mut f = std::fs::File::create(&p).unwrap();
-        
-        match f.write_all(&bytes) {
-            Ok(_) => {
-                debug!("wrote to file {}", filename);
-                Some(TorrentleechTorrent{
-                    name: name_dot,
-                    uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
-                    url,
-                    freeleech,
-                    id,
-                    path: p.into(),
-                    size: t.size(),
-                })
-            },
-            Err(e) => {
-                error!("fail to write to file; {}", e);
-                None
-            }
-        }
+        return Some(TorrentleechTorrent{
+            name: name_dot,
+            uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
+            url,
+            freeleech,
+            id,
+            raw_torrent: bytes.to_vec(),
+            // path: p.into(),
+            size: t.size(),
+        });
     }
+
+
 
     async fn monitor(&self) -> Result<(), failure::Error> {
         let config = Config {
@@ -132,16 +140,15 @@ impl super::Tracker for TorrentleechTracker {
             channels: vec!["#tlannounces".to_owned()],
             ..Config::default()
         };
-    
+
+        info!("Connecting to IRC...");    
         let mut client = Client::from_config(config).await?;
         client.identify()?;
-    
         let mut stream = client.stream()?;
-    
+        info!("Connected");
         // let x = trackers::torrentleech::TorrentleechTracker{};
         // let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
     
-        info!("Connecting to IRC...");
     
         while let Some(message) = stream.next().await.transpose()? {
             match message.command {
@@ -159,7 +166,7 @@ impl super::Tracker for TorrentleechTracker {
                         // Optimization: For TL, write to disk after calling `.download()`? (keep in memory before that)
                         if x.size() < ((1 << 30) * 4) {
                             debug!("Size is less than 4GiB ({}), adding...", x.size());
-                            add_to_qbit(x);
+                            // add_to_qbit(x);
                         } else {
                             debug!("Size is too large, skipping... ({})", x.size());
                         }
