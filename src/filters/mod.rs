@@ -4,8 +4,8 @@ use regex;
 use crate::trackers;
 
 pub struct Filter {
-    valid_regexes: regex::RegexSet,
-    size_max: i64,
+    pub valid_regexes: regex::RegexSet,
+    pub size_max: i64, // we probably want to make this optional in the future.
 }
 
 impl Filter {
