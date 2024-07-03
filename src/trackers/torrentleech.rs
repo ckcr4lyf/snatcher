@@ -85,9 +85,6 @@ impl super::Tracker for TorrentleechTracker {
         client.identify()?;
         let mut stream = client.stream()?;
         info!("Connected");
-        // let x = trackers::torrentleech::TorrentleechTracker{};
-        // let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
-        // let f = filter.clone();
 
     
         while let Some(message) = stream.next().await.transpose()? {
@@ -102,12 +99,16 @@ impl super::Tracker for TorrentleechTracker {
                             debug!("Got new release: {:?}", x);
 
                             if filter.check(x) == true {
-
+                                debug!("Passed filter, we should get it");
+                            } else {
+                                debug!("Did not pass filter")
                             }
+                        } else {
+                            error!("Filed to parse message: {}", p2);
                         }
                     },
                     _ => {
-                        debug!("Got something we don't handle")
+                        // noop
                     }
                 }
             });
