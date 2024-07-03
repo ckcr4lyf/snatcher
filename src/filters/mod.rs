@@ -9,7 +9,7 @@ pub struct Filter {
 }
 
 impl Filter {
-    fn check(&self, torrent: impl trackers::Torrent) -> bool {
+    pub fn check(&self, torrent: impl trackers::Torrent) -> bool {
         if torrent.size() > self.size_max {
             debug!("Torrent size {} is larger than size_max {}. Skipping", torrent.size(), self.size_max);
             return false;

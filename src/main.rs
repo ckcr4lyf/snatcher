@@ -36,14 +36,15 @@ async fn main() -> Result<(), failure::Error> {
         size_max: cfg.max_size,
     };
 
-    let tl_t = tokio::spawn(async move {
-        tl.monitor().await;
-    });
+    // let tl_t = tokio::spawn(async move {
+    //     tl.monitor(filter).await;
+    // });
     let ipt_t = tokio::spawn(async move {
-        ipt.monitor().await;
+        ipt.monitor(filter).await;
     });
 
-    join!(tl_t, ipt_t);
+    // join!(tl_t, ipt_t);
+    join!(ipt_t);
 
     Ok(())
 }

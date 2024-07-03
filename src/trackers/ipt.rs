@@ -4,10 +4,12 @@ use futures::StreamExt;
 use irc::{client::{data::Config, Client}, proto::Command};
 use log::{debug, error, info, trace};
 
+use crate::{action::add_to_qbit, filters};
+
 pub struct IptTracker {
     passkey: String,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IptTorrent {
     name: String,
     id: String,
@@ -17,7 +19,7 @@ pub struct IptTorrent {
 
 impl super::Torrent for IptTorrent {
     fn name(&self) -> &str {
-        todo!()
+        return self.name.as_str()
     }
 
     fn path(&self) -> &std::ffi::OsStr {
@@ -25,7 +27,18 @@ impl super::Torrent for IptTorrent {
     }
 
     fn size(&self) -> i64 {
-        todo!()
+        let parts: Vec<&str> = self.size.split(" ").collect();
+        trace!("Got parts as {:?}", parts);
+
+        let float_part: f32 = parts[0].parse::<f32>().unwrap();
+
+        let multiplier = match parts[1] {
+            "MB" => 1 << 20,
+            "GB" => 1 << 30,
+            _ => 1 << 10,
+        };
+
+        return (float_part * (multiplier as f32)) as i64;
     }
 }
 
@@ -105,7 +118,7 @@ impl super::Tracker for IptTracker {
         }
     }
 
-    async fn monitor(&self) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: filters::Filter) -> Result<(), failure::Error> {
         let config = Config{
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.iptorrents.com".to_owned()),
@@ -128,14 +141,22 @@ impl super::Tracker for IptTracker {
                     if let Some(x) = self.parse_message(&p2).await {
                         debug!("Got new release: {:?}", x);
 
-                        match self.download(x).await {
-                            Ok(p) => {
-                                debug!("Downloaded to {:?}", p)
-                            },
-                            Err(e) => {
-                                error!("Failed to download: {}", e)
+                        if filter.check(x.clone()) == true {
+                            debug!("Passed filter, we should get it");
+
+                            match self.download(x.clone()).await {
+                                Ok(p) => {
+                                    debug!("Downloaded to {:?}", p)
+                                },
+                                Err(e) => {
+                                    error!("Failed to download: {}", e)
+                                }
                             }
+                        } else {
+                            debug!("Did not pass filter");
                         }
+
+                        
                     } else {
                         error!("Failed to parse message: {}", p2);
                     }
