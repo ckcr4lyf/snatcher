@@ -1,4 +1,4 @@
-use std::{env::temp_dir, fmt::format, io::Write};
+use std::{env::temp_dir, fmt::format, io::Write, sync::Arc};
 
 use futures::StreamExt;
 use irc::{client::{data::Config, Client}, proto::Command};
@@ -6,6 +6,7 @@ use log::{debug, error, info, trace};
 
 use crate::{action::{add_to_qbit, add_to_qbit_v2}, filters};
 
+#[derive(Clone)]
 pub struct IptTracker {
     passkey: String,
 }
@@ -118,7 +119,7 @@ impl super::Tracker for IptTracker {
         }
     }
 
-    async fn monitor(&self, filter: &filters::Filter) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error> {
         let config = Config{
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.iptorrents.com".to_owned()),
