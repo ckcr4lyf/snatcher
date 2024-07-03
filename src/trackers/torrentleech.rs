@@ -5,7 +5,7 @@ use irc::{client::{data::Config, Client}, proto::Command};
 use log::{debug, error, info, trace};
 use serde_bencode::de;
 
-use crate::{action::add_to_qbit, torrent, trackers::Torrent};
+use crate::{action::add_to_qbit, filters, torrent, trackers::Torrent};
 
 pub struct TorrentleechTracker {
     rss_key: String,
@@ -132,7 +132,7 @@ impl super::Tracker for TorrentleechTracker {
 
 
 
-    async fn monitor(&self) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: &filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.torrentleech.org".to_owned()),
@@ -156,20 +156,16 @@ impl super::Tracker for TorrentleechTracker {
                     let x = self.parse_message(&p2).await;
                     if let Some(x) = x {
                         debug!("Got new release: {:?}", x);
-    
-                        // At this step, should apply the filtering rules?
-    
-                        // Then call .download()
-                        // For some trackers (like TL), it will be no-op since part of parse_msg (to get size)
-                        // For others, it will only then trigger the DL
-    
-                        // Optimization: For TL, write to disk after calling `.download()`? (keep in memory before that)
-                        if x.size() < ((1 << 30) * 4) {
-                            debug!("Size is less than 4GiB ({}), adding...", x.size());
-                            // add_to_qbit(x);
+
+                        if filter.check(x) == true {
+                            debug!("Passed filter, we should get it");
                         } else {
-                            debug!("Size is too large, skipping... ({})", x.size());
+                            debug!("Did not pass filter");
                         }
+                        
+                        // TODO:
+                        // Call download
+                        // Call add_to_qbit
                     } else {
                         error!("Failed to parse message: {}", p2);
                     }
