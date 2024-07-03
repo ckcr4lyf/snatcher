@@ -127,6 +127,15 @@ impl super::Tracker for IptTracker {
                     debug!("Got message: {}", p2);
                     if let Some(x) = self.parse_message(&p2).await {
                         debug!("Got new release: {:?}", x);
+
+                        match self.download(x).await {
+                            Ok(p) => {
+                                debug!("Downloaded to {:?}", p)
+                            },
+                            Err(e) => {
+                                error!("Failed to download: {}", e)
+                            }
+                        }
                     } else {
                         error!("Failed to parse message: {}", p2);
                     }
