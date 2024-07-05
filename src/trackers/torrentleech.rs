@@ -1,4 +1,4 @@
-use std::{env::temp_dir, ffi::{OsStr, OsString}, io::Write};
+use std::{env::temp_dir, ffi::{OsStr, OsString}, io::Write, sync::Arc};
 
 use futures::StreamExt;
 use irc::{client::{data::Config, Client}, proto::Command};
@@ -68,71 +68,10 @@ impl super::Tracker for TorrentleechTracker {
     }
 
     async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
-        trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
-
-        let name_start_index = msg.find("Name:'")?;
-        let name_end_index = msg.find("' uploaded by '")?;
-        let (uploader_end_index, freeleech, lenn) = match msg.find("' - ") {
-            Some(pos) => (pos, false, 11),
-            None => {
-                match msg.find("' freeleech - ") {
-                    Some(pos) => (pos, true, 21),
-                    None => return None
-                }
-            }
-        };
-
-        let name_original: String = msg[name_start_index+6..name_end_index].to_owned();
-        let name_dot = name_original.replace(" ", ".");
-        let url: String = msg[uploader_end_index+lenn..].to_owned();
-
-        let id_index = url.rfind("/")?;
-        let id: String = url[id_index+1..].to_owned();
-
-        let download_url = format!("https://www.torrentleech.org/rss/download/{}/{}/{}.torrent", id, self.rss_key, name_dot);
-
-        trace!("Going to download torrent from {}", download_url);
-        let res = reqwest::get(download_url).await;
-
-        let response = match res {
-            Ok(v) => v,
-            Err(e) => {
-                error!("Got error from HTTP request: {}", e);
-                return None;
-            }
-        };
-
-        trace!("Got HTTP {} from TL", response.status());
-        let bytes = response.bytes().await.unwrap();
-
-        // Try and parse torrent
-        trace!("Going to bencode-decode torrent");
-        let t = match de::from_bytes::<torrent::Torrent>(&bytes) {
-            Ok(t) => {
-                trace!("Parsed torrent, got {:?}", t);
-                t
-            },
-            Err(e) => {
-                error!("Error bencode-decoding torrent: {}", e);
-                return None;
-            }
-        };
-
-        return Some(TorrentleechTorrent{
-            name: name_dot,
-            uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
-            url,
-            freeleech,
-            id,
-            raw_torrent: bytes.to_vec(),
-            // path: p.into(),
-            size: t.size(),
-        });
+        todo!()
     }
 
-
-
-    async fn monitor(&self, filter: &filters::Filter) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error> {
         let config = Config {
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.torrentleech.org".to_owned()),
@@ -146,36 +85,98 @@ impl super::Tracker for TorrentleechTracker {
         client.identify()?;
         let mut stream = client.stream()?;
         info!("Connected");
-        // let x = trackers::torrentleech::TorrentleechTracker{};
-        // let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
-    
+
     
         while let Some(message) = stream.next().await.transpose()? {
-            match message.command {
-                Command::PRIVMSG(p1, p2) => {
-                    let x = self.parse_message(&p2).await;
-                    if let Some(x) = x {
-                        debug!("Got new release: {:?}", x);
+            let rss_key = self.rss_key.to_owned();
+            let filter = filter.clone();
 
-                        if filter.check(x) == true {
-                            debug!("Passed filter, we should get it");
+            tokio::spawn(async move {
+                match message.command {
+                    Command::PRIVMSG(_, p2) => {
+                        let x = parse_message(&rss_key, &p2).await;
+                        if let Some(x) = x {
+                            debug!("Got new release: {:?}", x);
+
+                            if filter.check(x) == true {
+                                debug!("Passed filter, we should get it");
+                            } else {
+                                debug!("Did not pass filter")
+                            }
                         } else {
-                            debug!("Did not pass filter");
+                            error!("Filed to parse message: {}", p2);
                         }
-                        
-                        // TODO:
-                        // Call download
-                        // Call add_to_qbit
-                    } else {
-                        error!("Failed to parse message: {}", p2);
+                    },
+                    _ => {
+                        // noop
                     }
-                },
-                other => {
-                    // println!("got something else: {:?}", other)
                 }
-            }
+            });
         }
     
         Ok(())
     }
+}
+
+async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> {
+    trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
+
+    let name_start_index = msg.find("Name:'")?;
+    let name_end_index = msg.find("' uploaded by '")?;
+    let (uploader_end_index, freeleech, lenn) = match msg.find("' - ") {
+        Some(pos) => (pos, false, 11),
+        None => {
+            match msg.find("' freeleech - ") {
+                Some(pos) => (pos, true, 21),
+                None => return None
+            }
+        }
+    };
+
+    let name_original: String = msg[name_start_index+6..name_end_index].to_owned();
+    let name_dot = name_original.replace(" ", ".");
+    let url: String = msg[uploader_end_index+lenn..].to_owned();
+
+    let id_index = url.rfind("/")?;
+    let id: String = url[id_index+1..].to_owned();
+
+    let download_url = format!("https://www.torrentleech.org/rss/download/{}/{}/{}.torrent", id, rss_key, name_dot);
+
+    trace!("Going to download torrent from {}", download_url);
+    let res = reqwest::get(download_url).await;
+
+    let response = match res {
+        Ok(v) => v,
+        Err(e) => {
+            error!("Got error from HTTP request: {}", e);
+            return None;
+        }
+    };
+
+    trace!("Got HTTP {} from TL", response.status());
+    let bytes = response.bytes().await.unwrap();
+
+    // Try and parse torrent
+    trace!("Going to bencode-decode torrent");
+    let t = match de::from_bytes::<torrent::Torrent>(&bytes) {
+        Ok(t) => {
+            trace!("Parsed torrent, got {:?}", t);
+            t
+        },
+        Err(e) => {
+            error!("Error bencode-decoding torrent: {}", e);
+            return None;
+        }
+    };
+
+    return Some(TorrentleechTorrent{
+        name: name_dot,
+        uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
+        url,
+        freeleech,
+        id,
+        raw_torrent: bytes.to_vec(),
+        // path: p.into(),
+        size: t.size(),
+    });
 }

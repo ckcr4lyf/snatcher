@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, sync::Arc};
 
 use action::add_to_qbit;
 use irc::client::prelude::*;
@@ -31,16 +31,16 @@ async fn main() -> Result<(), failure::Error> {
     let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
     let ipt = trackers::ipt::IptTracker::new(&env::var("IPT_PASSKEY").unwrap());
 
-    let filter = filters::Filter{
+    let filter = Arc::new(filters::Filter{
         valid_regexes: RegexSet::new(&cfg.valid_regexes).unwrap(),
         size_max: cfg.max_size,
-    };
+    });
 
     // let tl_t = tokio::spawn(async move {
     //     tl.monitor(&filter).await;
     // });
     let ipt_t = tokio::spawn(async move {
-        ipt.monitor(&filter).await;
+        ipt.monitor(filter).await;
     });
 
     // join!(tl_t, ipt_t);
