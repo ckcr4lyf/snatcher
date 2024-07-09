@@ -11,12 +11,19 @@ pub struct Filter {
 impl Filter {
     pub fn check(&self, torrent: impl trackers::Torrent) -> bool {
         if torrent.size() > self.size_max {
-            debug!("Torrent size {} is larger than size_max {}. Skipping", torrent.size(), self.size_max);
+            debug!(
+                "Torrent size {} is larger than size_max {}. Skipping",
+                torrent.size(),
+                self.size_max
+            );
             return false;
         }
 
         if self.valid_regexes.matches(torrent.name()).matched_any() == false {
-            debug!("Torrent name {} did not match any of the regexes!", torrent.name());
+            debug!(
+                "Torrent name {} did not match any of the regexes!",
+                torrent.name()
+            );
             return false;
         }
 
@@ -52,18 +59,18 @@ mod tests {
     }
 
     #[test]
-    fn check(){
-        let filter = Filter{
+    fn check() {
+        let filter = Filter {
             size_max: 4000,
             valid_regexes: RegexSet::new(&[r"^YOLO$"]).unwrap(),
         };
-        
-        let dummy_valid = DummyTorrent{
+
+        let dummy_valid = DummyTorrent {
             size: 100,
             name: "YOLO".to_owned(),
         };
 
-        let dummy_invalid = DummyTorrent{
+        let dummy_invalid = DummyTorrent {
             size: 100,
             name: "XD".to_owned(),
         };

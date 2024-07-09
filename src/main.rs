@@ -1,8 +1,8 @@
 use std::{env, sync::Arc};
 
 use action::add_to_qbit;
-use irc::client::prelude::*;
 use futures::prelude::*;
+use irc::client::prelude::*;
 
 mod trackers;
 use log::{debug, error, info};
@@ -10,9 +10,9 @@ use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use tokio::join;
 use trackers::{Torrent, Tracker};
-mod torrent;
 mod action;
 mod filters;
+mod torrent;
 
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -31,7 +31,7 @@ async fn main() -> Result<(), failure::Error> {
     let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
     let ipt = trackers::ipt::IptTracker::new(&env::var("IPT_PASSKEY").unwrap());
 
-    let filter = Arc::new(filters::Filter{
+    let filter = Arc::new(filters::Filter {
         valid_regexes: RegexSet::new(&cfg.valid_regexes).unwrap(),
         size_max: cfg.max_size,
     });

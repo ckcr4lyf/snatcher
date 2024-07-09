@@ -1,7 +1,15 @@
-use std::{env::temp_dir, ffi::{OsStr, OsString}, io::Write, sync::Arc};
+use std::{
+    env::temp_dir,
+    ffi::{OsStr, OsString},
+    io::Write,
+    sync::Arc,
+};
 
 use futures::StreamExt;
-use irc::{client::{data::Config, Client}, proto::Command};
+use irc::{
+    client::{data::Config, Client},
+    proto::Command,
+};
 use log::{debug, error, info, trace};
 use serde_bencode::de;
 
@@ -13,7 +21,7 @@ pub struct TorrentleechTracker {
 
 impl TorrentleechTracker {
     pub fn new(rss_key: &str) -> Self {
-        TorrentleechTracker{
+        TorrentleechTracker {
             rss_key: rss_key.to_owned(),
         }
     }
@@ -42,10 +50,9 @@ impl super::Torrent for TorrentleechTorrent {
     }
 
     fn size(&self) -> i64 {
-        return self.size
+        return self.size;
     }
 }
-
 
 impl super::Tracker for TorrentleechTracker {
     type Torrent = TorrentleechTorrent;
@@ -54,12 +61,12 @@ impl super::Tracker for TorrentleechTracker {
         let filename = format!("{}.torrent", &torrent.name);
         let p = temp_dir().as_path().join(&filename);
         let mut f = std::fs::File::create(&p).unwrap();
-        
+
         match f.write_all(&torrent.raw_torrent) {
             Ok(_) => {
                 debug!("wrote to file {}", filename);
                 return Ok(p.into_os_string());
-            },
+            }
             Err(e) => {
                 error!("fail to write to file; {}", e);
                 return Err(e.into());
@@ -80,13 +87,12 @@ impl super::Tracker for TorrentleechTracker {
             ..Config::default()
         };
 
-        info!("Connecting to IRC...");    
+        info!("Connecting to IRC...");
         let mut client = Client::from_config(config).await?;
         client.identify()?;
         let mut stream = client.stream()?;
         info!("Connected");
 
-    
         while let Some(message) = stream.next().await.transpose()? {
             let rss_key = self.rss_key.to_owned();
             let filter = filter.clone();
@@ -106,14 +112,14 @@ impl super::Tracker for TorrentleechTracker {
                         } else {
                             error!("Filed to parse message: {}", p2);
                         }
-                    },
+                    }
                     _ => {
                         // noop
                     }
                 }
             });
         }
-    
+
         Ok(())
     }
 }
@@ -125,22 +131,23 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
     let name_end_index = msg.find("' uploaded by '")?;
     let (uploader_end_index, freeleech, lenn) = match msg.find("' - ") {
         Some(pos) => (pos, false, 11),
-        None => {
-            match msg.find("' freeleech - ") {
-                Some(pos) => (pos, true, 21),
-                None => return None
-            }
-        }
+        None => match msg.find("' freeleech - ") {
+            Some(pos) => (pos, true, 21),
+            None => return None,
+        },
     };
 
-    let name_original: String = msg[name_start_index+6..name_end_index].to_owned();
+    let name_original: String = msg[name_start_index + 6..name_end_index].to_owned();
     let name_dot = name_original.replace(" ", ".");
-    let url: String = msg[uploader_end_index+lenn..].to_owned();
+    let url: String = msg[uploader_end_index + lenn..].to_owned();
 
     let id_index = url.rfind("/")?;
-    let id: String = url[id_index+1..].to_owned();
+    let id: String = url[id_index + 1..].to_owned();
 
-    let download_url = format!("https://www.torrentleech.org/rss/download/{}/{}/{}.torrent", id, rss_key, name_dot);
+    let download_url = format!(
+        "https://www.torrentleech.org/rss/download/{}/{}/{}.torrent",
+        id, rss_key, name_dot
+    );
 
     trace!("Going to download torrent from {}", download_url);
     let res = reqwest::get(download_url).await;
@@ -162,16 +169,16 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
         Ok(t) => {
             trace!("Parsed torrent, got {:?}", t);
             t
-        },
+        }
         Err(e) => {
             error!("Error bencode-decoding torrent: {}", e);
             return None;
         }
     };
 
-    return Some(TorrentleechTorrent{
+    return Some(TorrentleechTorrent {
         name: name_dot,
-        uploader: msg[name_end_index+15..uploader_end_index].to_owned(),
+        uploader: msg[name_end_index + 15..uploader_end_index].to_owned(),
         url,
         freeleech,
         id,

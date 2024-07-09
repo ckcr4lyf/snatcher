@@ -1,10 +1,16 @@
 use std::{env::temp_dir, fmt::format, io::Write, sync::Arc};
 
 use futures::StreamExt;
-use irc::{client::{data::Config, Client}, proto::Command};
+use irc::{
+    client::{data::Config, Client},
+    proto::Command,
+};
 use log::{debug, error, info, trace};
 
-use crate::{action::{add_to_qbit, add_to_qbit_v2}, filters};
+use crate::{
+    action::{add_to_qbit, add_to_qbit_v2},
+    filters,
+};
 
 #[derive(Clone)]
 pub struct IptTracker {
@@ -20,7 +26,7 @@ pub struct IptTorrent {
 
 impl super::Torrent for IptTorrent {
     fn name(&self) -> &str {
-        return self.name.as_str()
+        return self.name.as_str();
     }
 
     fn path(&self) -> &std::ffi::OsStr {
@@ -45,7 +51,7 @@ impl super::Torrent for IptTorrent {
 
 impl IptTracker {
     pub fn new(passkey: &str) -> Self {
-        IptTracker{
+        IptTracker {
             passkey: passkey.to_owned(),
         }
     }
@@ -63,7 +69,10 @@ impl super::Tracker for IptTracker {
     }
 
     async fn download(&self, torrent: Self::Torrent) -> Result<std::ffi::OsString, failure::Error> {
-        let download_url = format!("https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}", torrent.id, torrent.name, self.passkey);
+        let download_url = format!(
+            "https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}",
+            torrent.id, torrent.name, self.passkey
+        );
 
         trace!("Going to download torrent from {}", download_url);
         let res = reqwest::get(download_url).await;
@@ -83,12 +92,12 @@ impl super::Tracker for IptTracker {
         let filename = format!("{}.torrent", torrent.name);
         let p = temp_dir().as_path().join(&filename);
         let mut f = std::fs::File::create(&p).unwrap();
-        
+
         match f.write_all(&bytes) {
             Ok(_) => {
                 debug!("wrote to file {}", filename);
                 return Ok(p.into_os_string());
-            },
+            }
             Err(e) => {
                 error!("fail to write to file; {}", e);
                 return Err(e.into());
@@ -97,7 +106,7 @@ impl super::Tracker for IptTracker {
     }
 
     async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error> {
-        let config = Config{
+        let config = Config {
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.iptorrents.com".to_owned()),
             port: Some(6667),
@@ -115,7 +124,7 @@ impl super::Tracker for IptTracker {
         while let Some(message) = stream.next().await.transpose()? {
             let passkey = self.passkey.to_owned();
             let filter = filter.clone();
-            tokio::spawn(async move{
+            tokio::spawn(async move {
                 match message.command {
                     Command::PRIVMSG(_, p2) => {
                         debug!("Got message: {}", p2);
@@ -129,7 +138,7 @@ impl super::Tracker for IptTracker {
                                     Ok(p) => {
                                         debug!("Downloaded to {:?}", &p);
                                         add_to_qbit_v2(&p);
-                                    },
+                                    }
                                     Err(e) => {
                                         error!("Failed to download: {}", e)
                                     }
@@ -137,12 +146,10 @@ impl super::Tracker for IptTracker {
                             } else {
                                 debug!("Did not pass filter");
                             }
-
-                            
                         } else {
                             error!("Failed to parse message: {}", p2);
                         }
-                    },
+                    }
                     _ => {
                         // noop
                     }
@@ -161,7 +168,7 @@ async fn parse_message(msg: &str) -> Option<IptTorrent> {
 
     // First check if we can find FREELEECH, if not then normal ending
     let (name_end_index, freeleech, https_index) = match msg.find("4FREELEECH - https") {
-        Some(pos) => (pos-2, true, pos + 13),
+        Some(pos) => (pos - 2, true, pos + 13),
         None => {
             let pos = msg.find("https://www.iptorrents")?;
             (pos - 4, false, pos)
@@ -170,10 +177,10 @@ async fn parse_message(msg: &str) -> Option<IptTorrent> {
 
     let size_index = https_index + msg[https_index..].find(" ")? + 5;
     let name = msg[name_start_index..name_end_index].to_owned(); // This is name WITH spaces
-    let torrent_id = msg[https_index+42..size_index-5].to_owned();
+    let torrent_id = msg[https_index + 42..size_index - 5].to_owned();
     let size = msg[size_index..].to_owned();
 
-    Some(IptTorrent{
+    Some(IptTorrent {
         name,
         id: torrent_id,
         freeleech,
@@ -181,9 +188,14 @@ async fn parse_message(msg: &str) -> Option<IptTorrent> {
     })
 }
 
-
-async fn download_torrent(passkey: &str, torrent: IptTorrent) -> Result<std::ffi::OsString, failure::Error> {
-    let download_url = format!("https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}", torrent.id, torrent.name, passkey);
+async fn download_torrent(
+    passkey: &str,
+    torrent: IptTorrent,
+) -> Result<std::ffi::OsString, failure::Error> {
+    let download_url = format!(
+        "https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}",
+        torrent.id, torrent.name, passkey
+    );
 
     trace!("Going to download torrent from {}", download_url);
     let res = reqwest::get(download_url).await;
@@ -203,12 +215,12 @@ async fn download_torrent(passkey: &str, torrent: IptTorrent) -> Result<std::ffi
     let filename = format!("{}.torrent", torrent.name);
     let p = temp_dir().as_path().join(&filename);
     let mut f = std::fs::File::create(&p).unwrap();
-    
+
     match f.write_all(&bytes) {
         Ok(_) => {
             debug!("wrote to file {}", filename);
             return Ok(p.into_os_string());
-        },
+        }
         Err(e) => {
             error!("fail to write to file; {}", e);
             return Err(e.into());

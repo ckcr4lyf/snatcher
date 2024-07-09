@@ -1,6 +1,5 @@
 // Heavily from https://github.com/toby/serde-bencode/blob/f36b82c6d528a4f84e7627c6fb06b7e3f4bdb1c4/examples/parse_torrent.rs
 
-
 use serde::Deserialize;
 use serde_bencode::de;
 use std::io::{self, Read};
@@ -74,4 +73,3 @@ impl Torrent {
         return u;
     }
 }
-
