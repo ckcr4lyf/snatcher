@@ -19,17 +19,33 @@ mod torrent;
 struct Config {
     valid_regexes: Vec<String>,
     max_size: i64,
+
+    // Per Tracker Configs
+    ipt: IptConfig,
+    torrentleech: TorrentleechConfig,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct IptConfig {
+    username: String,
+    passkey: String,
+}
+
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct TorrentleechConfig {
+    username: String,
+    rss_key: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
     env_logger::init();
-    // We can also load the Config at runtime via Config::load("path/to/config.toml")
 
     let cfg: Config = confy::load("snatcher", "snatcher").unwrap();
-
-    let tl = trackers::torrentleech::TorrentleechTracker::new(&env::var("TL_RSS_KEY").unwrap());
-    let ipt = trackers::ipt::IptTracker::new(&env::var("IPT_PASSKEY").unwrap());
+    let tl = trackers::torrentleech::TorrentleechTracker::new(&cfg.torrentleech.rss_key);
+    let ipt = trackers::ipt::IptTracker::new(&cfg.ipt.passkey);
 
     let filter = Arc::new(filters::Filter {
         valid_regexes: RegexSet::new(&cfg.valid_regexes).unwrap(),
@@ -40,7 +56,7 @@ async fn main() -> Result<(), failure::Error> {
     //     tl.monitor(&filter).await;
     // });
     let ipt_t = tokio::spawn(async move {
-        ipt.monitor(filter).await;
+        // ipt.monitor(filter).await;
     });
 
     // join!(tl_t, ipt_t);
