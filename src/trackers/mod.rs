@@ -1,9 +1,12 @@
-use std::{ffi::{OsStr, OsString}, sync::Arc};
+use std::{
+    ffi::{OsStr, OsString},
+    sync::Arc,
+};
 
 use crate::filters;
 
-pub mod torrentleech;
 pub mod ipt;
+pub mod torrentleech;
 
 pub trait Torrent: std::fmt::Debug {
     fn name(&self) -> &str;
