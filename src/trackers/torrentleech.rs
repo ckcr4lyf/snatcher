@@ -13,16 +13,16 @@ use irc::{
 use log::{debug, error, info, trace};
 use serde_bencode::de;
 
-use crate::{action::add_to_qbit, filters, torrent, trackers::Torrent};
+use crate::{action::add_to_qbit, filters, torrent, trackers::Torrent, TorrentleechConfig};
 
 pub struct TorrentleechTracker {
-    rss_key: String,
+    config: &'static TorrentleechConfig
 }
 
 impl TorrentleechTracker {
-    pub fn new(rss_key: &str) -> Self {
+    pub fn new(config: &'static TorrentleechConfig) -> Self {
         TorrentleechTracker {
-            rss_key: rss_key.to_owned(),
+            config,
         }
     }
 }
@@ -94,7 +94,7 @@ impl super::Tracker for TorrentleechTracker {
         info!("Connected");
 
         while let Some(message) = stream.next().await.transpose()? {
-            let rss_key = self.rss_key.to_owned();
+            let rss_key = self.config.rss_key.to_owned();
             let filter = filter.clone();
 
             tokio::spawn(async move {

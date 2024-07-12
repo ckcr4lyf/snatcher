@@ -45,7 +45,7 @@ async fn main() -> Result<(), failure::Error> {
 
     let cfg: Box<Config> = Box::new(confy::load("snatcher", "snatcher").unwrap());
     let leaked_config = Box::leak(cfg);
-    let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech.rss_key);
+    let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech);
     let ipt = trackers::ipt::IptTracker::new(&leaked_config.ipt);
 
     let filter = Arc::new(filters::Filter {
