@@ -80,7 +80,7 @@ impl super::Tracker for TorrentleechTracker {
 
     async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
-            nickname: Some("snatcherdev_bot".to_owned()),
+            nickname: Some(self.config.username.to_owned()),
             server: Some("irc.torrentleech.org".to_owned()),
             port: Some(7021),
             channels: vec!["#tlannounces".to_owned()],

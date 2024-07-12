@@ -107,7 +107,7 @@ impl super::Tracker for IptTracker {
 
     async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
-            nickname: Some("snatcherdev_bot".to_owned()),
+            nickname: Some(self.config.username.to_owned()),
             server: Some("irc.iptorrents.com".to_owned()),
             port: Some(6667),
             channels: vec!["#ipt.announce".to_owned()],
