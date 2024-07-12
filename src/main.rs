@@ -43,13 +43,14 @@ struct TorrentleechConfig {
 async fn main() -> Result<(), failure::Error> {
     env_logger::init();
 
-    let cfg: Config = confy::load("snatcher", "snatcher").unwrap();
-    let tl = trackers::torrentleech::TorrentleechTracker::new(&cfg.torrentleech.rss_key);
-    let ipt = trackers::ipt::IptTracker::new(&cfg.ipt.passkey);
+    let cfg: Box<Config> = Box::new(confy::load("snatcher", "snatcher").unwrap());
+    let leaked_config = Box::leak(cfg);
+    let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech.rss_key);
+    let ipt = trackers::ipt::IptTracker::new(&leaked_config.ipt);
 
     let filter = Arc::new(filters::Filter {
-        valid_regexes: RegexSet::new(&cfg.valid_regexes).unwrap(),
-        size_max: cfg.max_size,
+        valid_regexes: RegexSet::new(&leaked_config.valid_regexes).unwrap(),
+        size_max: leaked_config.max_size,
     });
 
     // let tl_t = tokio::spawn(async move {

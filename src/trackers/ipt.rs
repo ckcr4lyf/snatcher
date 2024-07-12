@@ -9,12 +9,12 @@ use log::{debug, error, info, trace};
 
 use crate::{
     action::{add_to_qbit, add_to_qbit_v2},
-    filters,
+    filters, IptConfig,
 };
 
 #[derive(Clone)]
 pub struct IptTracker {
-    passkey: String,
+    config: &'static IptConfig,
 }
 #[derive(Debug, Clone)]
 pub struct IptTorrent {
@@ -50,9 +50,9 @@ impl super::Torrent for IptTorrent {
 }
 
 impl IptTracker {
-    pub fn new(passkey: &str) -> Self {
+    pub fn new(config: &'static IptConfig) -> Self {
         IptTracker {
-            passkey: passkey.to_owned(),
+            config: config,
         }
     }
 }
@@ -71,7 +71,7 @@ impl super::Tracker for IptTracker {
     async fn download(&self, torrent: Self::Torrent) -> Result<std::ffi::OsString, failure::Error> {
         let download_url = format!(
             "https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}",
-            torrent.id, torrent.name, self.passkey
+            torrent.id, torrent.name, self.config.passkey
         );
 
         trace!("Going to download torrent from {}", download_url);
@@ -122,7 +122,7 @@ impl super::Tracker for IptTracker {
         info!("Connected");
 
         while let Some(message) = stream.next().await.transpose()? {
-            let passkey = self.passkey.to_owned();
+            let passkey = self.config.passkey.to_owned();
             let filter = filter.clone();
             tokio::spawn(async move {
                 match message.command {
