@@ -13,16 +13,16 @@ use irc::{
 use log::{debug, error, info, trace};
 use serde_bencode::de;
 
-use crate::{action::add_to_qbit, filters, torrent, trackers::Torrent};
+use crate::{action::add_to_qbit, filters, torrent, trackers::Torrent, TorrentleechConfig};
 
 pub struct TorrentleechTracker {
-    rss_key: String,
+    config: &'static TorrentleechConfig
 }
 
 impl TorrentleechTracker {
-    pub fn new(rss_key: &str) -> Self {
+    pub fn new(config: &'static TorrentleechConfig) -> Self {
         TorrentleechTracker {
-            rss_key: rss_key.to_owned(),
+            config,
         }
     }
 }
@@ -78,9 +78,9 @@ impl super::Tracker for TorrentleechTracker {
         todo!()
     }
 
-    async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
-            nickname: Some("snatcherdev_bot".to_owned()),
+            nickname: Some(self.config.username.to_owned()),
             server: Some("irc.torrentleech.org".to_owned()),
             port: Some(7021),
             channels: vec!["#tlannounces".to_owned()],
@@ -94,8 +94,7 @@ impl super::Tracker for TorrentleechTracker {
         info!("Connected");
 
         while let Some(message) = stream.next().await.transpose()? {
-            let rss_key = self.rss_key.to_owned();
-            let filter = filter.clone();
+            let rss_key = self.config.rss_key.to_owned();
 
             tokio::spawn(async move {
                 match message.command {
