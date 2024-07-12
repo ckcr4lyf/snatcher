@@ -17,7 +17,7 @@ pub trait Torrent: std::fmt::Debug {
 pub trait Tracker {
     type Torrent: Torrent;
 
-    async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error>;
+    async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error>;
     async fn parse_message(&self, msg: &str) -> Option<Self::Torrent>;
     async fn download(&self, torrent: Self::Torrent) -> Result<OsString, failure::Error>;
 }

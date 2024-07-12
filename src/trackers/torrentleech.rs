@@ -78,7 +78,7 @@ impl super::Tracker for TorrentleechTracker {
         todo!()
     }
 
-    async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.torrentleech.org".to_owned()),
@@ -95,7 +95,6 @@ impl super::Tracker for TorrentleechTracker {
 
         while let Some(message) = stream.next().await.transpose()? {
             let rss_key = self.config.rss_key.to_owned();
-            let filter = filter.clone();
 
             tokio::spawn(async move {
                 match message.command {

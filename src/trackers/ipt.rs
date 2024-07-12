@@ -105,7 +105,7 @@ impl super::Tracker for IptTracker {
         }
     }
 
-    async fn monitor(&self, filter: Arc<filters::Filter>) -> Result<(), failure::Error> {
+    async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
         let config = Config {
             nickname: Some("snatcherdev_bot".to_owned()),
             server: Some("irc.iptorrents.com".to_owned()),
@@ -123,7 +123,6 @@ impl super::Tracker for IptTracker {
 
         while let Some(message) = stream.next().await.transpose()? {
             let passkey = self.config.passkey.to_owned();
-            let filter = filter.clone();
             tokio::spawn(async move {
                 match message.command {
                     Command::PRIVMSG(_, p2) => {
