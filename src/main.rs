@@ -45,8 +45,6 @@ async fn main() -> Result<(), failure::Error> {
 
     let cfg: Box<Config> = Box::new(confy::load("snatcher", "snatcher").unwrap());
     let leaked_config = Box::leak(cfg);
-    let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech);
-    let ipt = trackers::ipt::IptTracker::new(&leaked_config.ipt);
 
     let filter = Box::new(filters::Filter {
         valid_regexes: RegexSet::new(&leaked_config.valid_regexes).unwrap(),
@@ -54,15 +52,18 @@ async fn main() -> Result<(), failure::Error> {
     });
     let leaked_filter: &'static filters::Filter = Box::leak(filter);
 
+    let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech);
+    let ipt = trackers::ipt::IptTracker::new(&leaked_config.ipt);
+
     let tl_t = tokio::spawn(async move {
-        tl.monitor(&leaked_filter).await;
+        tl.monitor(&leaked_filter).await
     });
     let ipt_t = tokio::spawn(async move {
-        ipt.monitor(&leaked_filter).await;
+        ipt.monitor(&leaked_filter).await
     });
 
-    // join!(tl_t, ipt_t);
-    join!(tl_t, ipt_t);
+    // We don't care about the result (should we?)
+    let _ = join!(tl_t, ipt_t);
 
     Ok(())
 }
