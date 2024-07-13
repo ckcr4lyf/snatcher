@@ -13,19 +13,7 @@ use irc::{
 use log::{debug, error, info, trace};
 use serde_bencode::de;
 
-use crate::{action::add_to_qbit, filters, torrent, trackers::Torrent, TorrentleechConfig};
-
-pub struct TorrentleechTracker {
-    config: &'static TorrentleechConfig
-}
-
-impl TorrentleechTracker {
-    pub fn new(config: &'static TorrentleechConfig) -> Self {
-        TorrentleechTracker {
-            config,
-        }
-    }
-}
+use crate::{action::{add_to_qbit, add_to_qbit_v2}, filters, torrent, trackers::Torrent, TorrentleechConfig};
 
 #[derive(Debug)]
 pub struct TorrentleechTorrent {
@@ -51,75 +39,6 @@ impl super::Torrent for TorrentleechTorrent {
 
     fn size(&self) -> i64 {
         return self.size;
-    }
-}
-
-impl super::Tracker for TorrentleechTracker {
-    type Torrent = TorrentleechTorrent;
-
-    async fn download(&self, torrent: Self::Torrent) -> Result<OsString, failure::Error> {
-        let filename = format!("{}.torrent", &torrent.name);
-        let p = temp_dir().as_path().join(&filename);
-        let mut f = std::fs::File::create(&p).unwrap();
-
-        match f.write_all(&torrent.raw_torrent) {
-            Ok(_) => {
-                debug!("wrote to file {}", filename);
-                return Ok(p.into_os_string());
-            }
-            Err(e) => {
-                error!("fail to write to file; {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-
-    async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
-        todo!()
-    }
-
-    async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
-        let config = Config {
-            nickname: Some(self.config.username.to_owned()),
-            server: Some("irc.torrentleech.org".to_owned()),
-            port: Some(7021),
-            channels: vec!["#tlannounces".to_owned()],
-            ..Config::default()
-        };
-
-        info!("Connecting to IRC...");
-        let mut client = Client::from_config(config).await?;
-        client.identify()?;
-        let mut stream = client.stream()?;
-        info!("Connected");
-
-        while let Some(message) = stream.next().await.transpose()? {
-            let rss_key = self.config.rss_key.to_owned();
-
-            tokio::spawn(async move {
-                match message.command {
-                    Command::PRIVMSG(_, p2) => {
-                        let x = parse_message(&rss_key, &p2).await;
-                        if let Some(x) = x {
-                            debug!("Got new release: {:?}", x);
-
-                            if filter.check(&x) == true {
-                                debug!("Passed filter, we should get it");
-                            } else {
-                                debug!("Did not pass filter")
-                            }
-                        } else {
-                            error!("Filed to parse message: {}", p2);
-                        }
-                    }
-                    _ => {
-                        // noop
-                    }
-                }
-            });
-        }
-
-        Ok(())
     }
 }
 
@@ -185,4 +104,78 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
         // path: p.into(),
         size: t.size(),
     });
+}
+
+async fn download_torrent(torrent: &TorrentleechTorrent) -> Result<OsString, failure::Error> {
+    let filename = format!("{}.torrent", &torrent.name);
+    let p = temp_dir().as_path().join(&filename);
+    let mut f = std::fs::File::create(&p).unwrap();
+
+    match f.write_all(&torrent.raw_torrent) {
+        Ok(_) => {
+            debug!("wrote to file {}", filename);
+            return Ok(p.into_os_string());
+        }
+        Err(e) => {
+            error!("fail to write to file; {}", e);
+            return Err(e.into());
+        }
+    }
+}
+
+pub async fn monitor(tracker_config: &'static TorrentleechConfig) -> Result<(), failure::Error> {
+    let config = Config {
+        nickname: Some(tracker_config.username.to_owned()),
+        server: Some("irc.torrentleech.org".to_owned()),
+        port: Some(7021),
+        channels: vec!["#tlannounces".to_owned()],
+        ..Config::default()
+    };
+
+    info!("Connecting to IRC...");
+    let mut client = Client::from_config(config).await?;
+    client.identify()?;
+    let mut stream = client.stream()?;
+    info!("Connected");
+
+    let filter: &'static filters::Filter = Box::leak(Box::new(filters::Filter{
+        valid_regexes: regex::RegexSet::new(&tracker_config.filter.valid_regexes).unwrap(),
+        size_max: tracker_config.filter.max_size,
+    }));
+
+    while let Some(message) = stream.next().await.transpose()? {
+        tokio::spawn(async move {
+            match message.command {
+                Command::PRIVMSG(_, p2) => {
+                    let x = parse_message(&tracker_config.rss_key, &p2).await;
+                    if let Some(x) = x {
+                        debug!("Got new release: {} (Size: {})", x.name, x.size);
+
+                        if filter.check(&x) == true {
+                            debug!("Passed filter, we should get it");
+
+                            match download_torrent(&x).await {
+                                Ok(p) => {
+                                    debug!("Downloaded to {:?}", &p);
+                                    add_to_qbit_v2(&p);
+                                }
+                                Err(e) => {
+                                    error!("Failed to download: {}", e)
+                                }
+                            }
+                        } else {
+                            debug!("Did not pass filter")
+                        }
+                    } else {
+                        error!("Filed to parse message: {}", p2);
+                    }
+                }
+                _ => {
+                    // noop
+                }
+            }
+        });
+    }
+
+    Ok(())
 }

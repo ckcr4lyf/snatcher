@@ -9,7 +9,7 @@ use log::{debug, error, info};
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use tokio::join;
-use trackers::{ipt::ipt_monitor, Torrent, Tracker};
+use trackers::{ipt::ipt_monitor, torrentleech, Torrent, Tracker};
 mod action;
 mod filters;
 mod torrent;
@@ -52,17 +52,10 @@ async fn main() -> Result<(), failure::Error> {
     let cfg: Box<Config> = Box::new(confy::load("snatcher", "snatcher").unwrap());
     let leaked_config: &'static Config = Box::leak(cfg);
 
-    info!("Got config as {:?}", &leaked_config);
-
-    let tl_filter = Box::new(filters::Filter {
-        valid_regexes: RegexSet::new(&leaked_config.torrentleech.filter.valid_regexes).unwrap(),
-        size_max: leaked_config.torrentleech.filter.max_size,
-    });
-    let leaked_tl_filter: &'static filters::Filter = Box::leak(tl_filter);
+    debug!("Got config as {:?}", &leaked_config);
 
     let tl_t = tokio::spawn(async move {
-        let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech);
-        tl.monitor(&leaked_tl_filter).await
+        torrentleech::monitor(&leaked_config.torrentleech).await
     });
     
     let ipt_t = tokio::spawn(async move {

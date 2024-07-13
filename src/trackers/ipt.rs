@@ -11,11 +11,6 @@ use crate::{
     action::{add_to_qbit, add_to_qbit_v2},
     filters, IptConfig,
 };
-
-#[derive(Clone)]
-pub struct IptTracker {
-    config: &'static IptConfig,
-}
 #[derive(Debug, Clone)]
 pub struct IptTorrent {
     name: String,
@@ -49,116 +44,6 @@ impl super::Torrent for IptTorrent {
     }
 }
 
-impl IptTracker {
-    pub fn new(config: &'static IptConfig) -> Self {
-        IptTracker {
-            config: config,
-        }
-    }
-}
-
-impl super::Tracker for IptTracker {
-    type Torrent = IptTorrent;
-
-    // 5[Music/Packs]10 MP3 0Day 2024-06-30 4FREELEECH - https://www.iptorrents.com/details.php?id=6013681 -4 38.63 GB
-    // 5[Anime]10 [Moozzi2] Shomin Sample - 12 END (BD 1920x1080 x 264 FLACx2) - https://www.iptorrents.com/details.php?id=6013682 -4 1.14 GB
-    // Althought not visible in the "string", IRC formatting means there are control characters beteen e.g. the "-" and "4" (e.g. 0x03)
-    // so we cant use e.g find("-4")
-    async fn parse_message(&self, msg: &str) -> Option<Self::Torrent> {
-        todo!()
-    }
-
-    async fn download(&self, torrent: Self::Torrent) -> Result<std::ffi::OsString, failure::Error> {
-        let download_url = format!(
-            "https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}",
-            torrent.id, torrent.name, self.config.passkey
-        );
-
-        trace!("Going to download torrent from {}", download_url);
-        let res = reqwest::get(download_url).await;
-
-        let response = match res {
-            Ok(v) => v,
-            Err(e) => {
-                error!("Got error from HTTP request: {}", e);
-                return Err(e.into());
-            }
-        };
-
-        trace!("Got HTTP {} from IPT", response.status());
-        let bytes = response.bytes().await.unwrap();
-
-        // No need to bencode-decode here...
-        let filename = format!("{}.torrent", torrent.name);
-        let p = temp_dir().as_path().join(&filename);
-        let mut f = std::fs::File::create(&p).unwrap();
-
-        match f.write_all(&bytes) {
-            Ok(_) => {
-                debug!("wrote to file {}", filename);
-                return Ok(p.into_os_string());
-            }
-            Err(e) => {
-                error!("fail to write to file; {}", e);
-                return Err(e.into());
-            }
-        }
-    }
-
-    async fn monitor(&self, filter: &'static filters::Filter) -> Result<(), failure::Error> {
-        let config = Config {
-            nickname: Some(self.config.username.to_owned()),
-            server: Some("irc.iptorrents.com".to_owned()),
-            port: Some(6667),
-            channels: vec!["#ipt.announce".to_owned()],
-            use_tls: Some(false),
-            ..Config::default()
-        };
-
-        info!("Connecting to IRC...");
-        let mut client = Client::from_config(config).await?;
-        client.identify()?;
-        let mut stream = client.stream()?;
-        info!("Connected");
-
-        while let Some(message) = stream.next().await.transpose()? {
-            let passkey = self.config.passkey.to_owned();
-            tokio::spawn(async move {
-                match message.command {
-                    Command::PRIVMSG(_, p2) => {
-                        debug!("Got message: {}", p2);
-                        if let Some(x) = parse_message(&p2).await {
-                            debug!("Got new release: {:?}", x);
-
-                            if filter.check(&x) == true {
-                                debug!("Passed filter, we should get it");
-
-                                match download_torrent(&passkey, &x).await {
-                                    Ok(p) => {
-                                        debug!("Downloaded to {:?}", &p);
-                                        add_to_qbit_v2(&p);
-                                    }
-                                    Err(e) => {
-                                        error!("Failed to download: {}", e)
-                                    }
-                                }
-                            } else {
-                                debug!("Did not pass filter");
-                            }
-                        } else {
-                            error!("Failed to parse message: {}", p2);
-                        }
-                    }
-                    _ => {
-                        // noop
-                    }
-                }
-            });
-        }
-
-        Ok(())
-    }
-}
 
 async fn parse_message(msg: &str) -> Option<IptTorrent> {
     trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
@@ -254,7 +139,7 @@ pub async fn ipt_monitor(tracker_config: &'static IptConfig) -> Result<(), failu
                 Command::PRIVMSG(_, p2) => {
                     debug!("Got message: {}", p2);
                     if let Some(x) = parse_message(&p2).await {
-                        debug!("Got new release: {:?}", x);
+                        debug!("Got new release: {} (Size: {})", x.name, x.size);
 
                         if filter.check(&x) == true {
                             debug!("Passed filter, we should get it");
