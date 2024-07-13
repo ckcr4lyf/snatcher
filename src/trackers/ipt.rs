@@ -130,10 +130,10 @@ impl super::Tracker for IptTracker {
                         if let Some(x) = parse_message(&p2).await {
                             debug!("Got new release: {:?}", x);
 
-                            if filter.check(x.clone()) == true {
+                            if filter.check(&x) == true {
                                 debug!("Passed filter, we should get it");
 
-                                match download_torrent(&passkey, x.clone()).await {
+                                match download_torrent(&passkey, &x).await {
                                     Ok(p) => {
                                         debug!("Downloaded to {:?}", &p);
                                         add_to_qbit_v2(&p);
@@ -189,7 +189,7 @@ async fn parse_message(msg: &str) -> Option<IptTorrent> {
 
 async fn download_torrent(
     passkey: &str,
-    torrent: IptTorrent,
+    torrent: &IptTorrent,
 ) -> Result<std::ffi::OsString, failure::Error> {
     let download_url = format!(
         "https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}",
@@ -225,4 +225,62 @@ async fn download_torrent(
             return Err(e.into());
         }
     }
+}
+
+pub async fn ipt_monitor(tracker_config: &'static IptConfig) -> Result<(), failure::Error> {
+    let config = Config {
+        nickname: Some(tracker_config.username.to_owned()),
+        server: Some("irc.iptorrents.com".to_owned()),
+        port: Some(6667),
+        channels: vec!["#ipt.announce".to_owned()],
+        use_tls: Some(false),
+        ..Config::default()
+    };
+
+    info!("Connecting to IRC...");
+    let mut client = Client::from_config(config).await?;
+    client.identify()?;
+    let mut stream = client.stream()?;
+    info!("Connected");
+
+    let filter: &'static filters::Filter = Box::leak(Box::new(filters::Filter {
+        valid_regexes: regex::RegexSet::new(&tracker_config.filter.valid_regexes).unwrap(),
+        size_max: tracker_config.filter.max_size,
+    }));
+
+    while let Some(message) = stream.next().await.transpose()? {
+        tokio::spawn(async move {
+            match message.command {
+                Command::PRIVMSG(_, p2) => {
+                    debug!("Got message: {}", p2);
+                    if let Some(x) = parse_message(&p2).await {
+                        debug!("Got new release: {:?}", x);
+
+                        if filter.check(&x) == true {
+                            debug!("Passed filter, we should get it");
+
+                            match download_torrent(&tracker_config.passkey, &x).await {
+                                Ok(p) => {
+                                    debug!("Downloaded to {:?}", &p);
+                                    add_to_qbit_v2(&p);
+                                }
+                                Err(e) => {
+                                    error!("Failed to download: {}", e)
+                                }
+                            }
+                        } else {
+                            debug!("Did not pass filter");
+                        }
+                    } else {
+                        error!("Failed to parse message: {}", p2);
+                    }
+                }
+                _ => {
+                    // noop
+                }
+            }
+        });
+    }
+
+    Ok(())
 }

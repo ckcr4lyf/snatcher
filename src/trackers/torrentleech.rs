@@ -103,7 +103,7 @@ impl super::Tracker for TorrentleechTracker {
                         if let Some(x) = x {
                             debug!("Got new release: {:?}", x);
 
-                            if filter.check(x) == true {
+                            if filter.check(&x) == true {
                                 debug!("Passed filter, we should get it");
                             } else {
                                 debug!("Did not pass filter")
