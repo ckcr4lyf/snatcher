@@ -14,29 +14,35 @@ mod action;
 mod filters;
 mod torrent;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct Config {
-    valid_regexes: Vec<String>,
-    max_size: i64,
-
     // Per Tracker Configs
     ipt: IptConfig,
     torrentleech: TorrentleechConfig,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
+#[serde(default)]
+struct FilterConfig {
+    valid_regexes: Vec<String>,
+    max_size: i64,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct IptConfig {
     username: String,
     passkey: String,
+    filter: FilterConfig,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct TorrentleechConfig {
     username: String,
     rss_key: String,
+    filter: FilterConfig,
 }
 
 #[tokio::main]
@@ -46,20 +52,28 @@ async fn main() -> Result<(), failure::Error> {
     let cfg: Box<Config> = Box::new(confy::load("snatcher", "snatcher").unwrap());
     let leaked_config = Box::leak(cfg);
 
-    let filter = Box::new(filters::Filter {
-        valid_regexes: RegexSet::new(&leaked_config.valid_regexes).unwrap(),
-        size_max: leaked_config.max_size,
+    info!("Got config as {:?}", &leaked_config);
+
+    let tl_filter = Box::new(filters::Filter {
+        valid_regexes: RegexSet::new(&leaked_config.torrentleech.filter.valid_regexes).unwrap(),
+        size_max: leaked_config.torrentleech.filter.max_size,
     });
-    let leaked_filter: &'static filters::Filter = Box::leak(filter);
+    let leaked_tl_filter: &'static filters::Filter = Box::leak(tl_filter);
+
+    let ipt_filter = Box::new(filters::Filter {
+        valid_regexes: RegexSet::new(&leaked_config.ipt.filter.valid_regexes).unwrap(),
+        size_max: leaked_config.ipt.filter.max_size,
+    });
+    let leaked_ipt_filter: &'static filters::Filter = Box::leak(ipt_filter);
 
     let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech);
     let ipt = trackers::ipt::IptTracker::new(&leaked_config.ipt);
 
     let tl_t = tokio::spawn(async move {
-        tl.monitor(&leaked_filter).await
+        tl.monitor(&leaked_tl_filter).await
     });
     let ipt_t = tokio::spawn(async move {
-        ipt.monitor(&leaked_filter).await
+        ipt.monitor(&leaked_ipt_filter).await
     });
 
     // We don't care about the result (should we?)
