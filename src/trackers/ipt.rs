@@ -44,7 +44,6 @@ impl super::Torrent for IptTorrent {
     }
 }
 
-
 async fn parse_message(msg: &str) -> Option<IptTorrent> {
     trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
 

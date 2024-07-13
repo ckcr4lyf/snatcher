@@ -54,13 +54,10 @@ async fn main() -> Result<(), failure::Error> {
 
     debug!("Got config as {:?}", &leaked_config);
 
-    let tl_t = tokio::spawn(async move {
-        torrentleech::monitor(&leaked_config.torrentleech).await
-    });
-    
-    let ipt_t = tokio::spawn(async move {
-        ipt_monitor(&leaked_config.ipt).await
-    });
+    let tl_t =
+        tokio::spawn(async move { torrentleech::monitor(&leaked_config.torrentleech).await });
+
+    let ipt_t = tokio::spawn(async move { ipt_monitor(&leaked_config.ipt).await });
 
     // We don't care about the result (should we?)
     let _ = join!(tl_t, ipt_t);

@@ -13,7 +13,12 @@ use irc::{
 use log::{debug, error, info, trace};
 use serde_bencode::de;
 
-use crate::{action::{add_to_qbit, add_to_qbit_v2}, filters, torrent, trackers::Torrent, TorrentleechConfig};
+use crate::{
+    action::{add_to_qbit, add_to_qbit_v2},
+    filters, torrent,
+    trackers::Torrent,
+    TorrentleechConfig,
+};
 
 #[derive(Debug)]
 pub struct TorrentleechTorrent {
@@ -138,7 +143,7 @@ pub async fn monitor(tracker_config: &'static TorrentleechConfig) -> Result<(), 
     let mut stream = client.stream()?;
     info!("Connected");
 
-    let filter: &'static filters::Filter = Box::leak(Box::new(filters::Filter{
+    let filter: &'static filters::Filter = Box::leak(Box::new(filters::Filter {
         valid_regexes: regex::RegexSet::new(&tracker_config.filter.valid_regexes).unwrap(),
         size_max: tracker_config.filter.max_size,
     }));
