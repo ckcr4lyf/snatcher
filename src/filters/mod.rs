@@ -9,7 +9,7 @@ pub struct Filter {
 }
 
 impl Filter {
-    pub fn check(&self, torrent: impl trackers::Torrent) -> bool {
+    pub fn check(&self, torrent: &impl trackers::Torrent) -> bool {
         if torrent.size() > self.size_max {
             debug!(
                 "Torrent size {} is larger than size_max {}. Skipping",
@@ -75,7 +75,7 @@ mod tests {
             name: "XD".to_owned(),
         };
 
-        assert_eq!(filter.check(dummy_valid), true);
-        assert_eq!(filter.check(dummy_invalid), false);
+        assert_eq!(filter.check(&dummy_valid), true);
+        assert_eq!(filter.check(&dummy_invalid), false);
     }
 }
