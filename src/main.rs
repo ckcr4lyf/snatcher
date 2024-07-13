@@ -60,18 +60,13 @@ async fn main() -> Result<(), failure::Error> {
     });
     let leaked_tl_filter: &'static filters::Filter = Box::leak(tl_filter);
 
-    let ipt_filter = Box::new(filters::Filter {
-        valid_regexes: RegexSet::new(&leaked_config.ipt.filter.valid_regexes).unwrap(),
-        size_max: leaked_config.ipt.filter.max_size,
-    });
-    let leaked_ipt_filter: &'static filters::Filter = Box::leak(ipt_filter);
-
     let tl_t = tokio::spawn(async move {
         let tl = trackers::torrentleech::TorrentleechTracker::new(&leaked_config.torrentleech);
         tl.monitor(&leaked_tl_filter).await
     });
+    
     let ipt_t = tokio::spawn(async move {
-        ipt_monitor(&leaked_config.ipt, &leaked_ipt_filter).await
+        ipt_monitor(&leaked_config.ipt).await
     });
 
     // We don't care about the result (should we?)

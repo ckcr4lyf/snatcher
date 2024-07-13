@@ -227,7 +227,7 @@ async fn download_torrent(
     }
 }
 
-pub async fn ipt_monitor(tracker_config: &'static IptConfig, filter: &'static filters::Filter) -> Result<(), failure::Error> {
+pub async fn ipt_monitor(tracker_config: &'static IptConfig) -> Result<(), failure::Error> {
     let config = Config {
         nickname: Some(tracker_config.username.to_owned()),
         server: Some("irc.iptorrents.com".to_owned()),
@@ -242,6 +242,11 @@ pub async fn ipt_monitor(tracker_config: &'static IptConfig, filter: &'static fi
     client.identify()?;
     let mut stream = client.stream()?;
     info!("Connected");
+
+    let filter: &'static filters::Filter = Box::leak(Box::new(filters::Filter {
+        valid_regexes: regex::RegexSet::new(&tracker_config.filter.valid_regexes).unwrap(),
+        size_max: tracker_config.filter.max_size,
+    }));
 
     while let Some(message) = stream.next().await.transpose()? {
         tokio::spawn(async move {
