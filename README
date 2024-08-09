@@ -4,7 +4,25 @@ snatcher
 Snatcher is an IRC based torrent downloader
 
 GOALS
-- Be an automatic torrent downloader for my personal use
+- Be an automatic torrent downloader for power users, with straightforward configuration through TOML files
 
 NON-GOALS
-- Be a generic replacement for autodl+irssi intended for public use
+- Be an easy-to-use replacement for other downloaders with fancy features
+
+
+Intalling
+---
+
+Assuming you have rust/cargo setup (e.g. via rustup: https://rustup.rs/)
+
+Then install via cargo:
+
+```
+cargo install --git --locked https://github.com/ckcr4lyf/snatcher.git
+```
+
+
+Configuration
+--- 
+
+TODO
