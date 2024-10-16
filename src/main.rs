@@ -60,7 +60,8 @@ async fn main() -> Result<(), failure::Error> {
     let ipt_t = tokio::spawn(async move { ipt_monitor(&leaked_config.ipt).await });
 
     // We don't care about the result (should we?)
-    let _ = join!(tl_t, ipt_t);
+    let (torrentleech_join_result, ipt_join_result) = join!(tl_t, ipt_t);
+    error!("We joined the threads, something went wrong!\nTorrentleech: {:?}\nIPT: {:?}", torrentleech_join_result, ipt_join_result);
 
     Ok(())
 }
