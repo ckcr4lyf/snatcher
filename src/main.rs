@@ -1,6 +1,7 @@
 use std::{env, sync::Arc};
 
 use action::add_to_qbit;
+use failure::Error;
 use futures::prelude::*;
 use irc::client::prelude::*;
 
@@ -8,8 +9,8 @@ mod trackers;
 use log::{debug, error, info};
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
-use tokio::join;
-use trackers::{ipt::ipt_monitor, torrentleech, Torrent, Tracker};
+use tokio::{join, task::JoinHandle};
+use trackers::{ipt, torrentleech, Torrent, Tracker};
 mod action;
 mod filters;
 mod torrent;
@@ -54,10 +55,56 @@ async fn main() -> Result<(), failure::Error> {
 
     debug!("Got config as {:?}", &leaked_config);
 
-    let tl_t =
-        tokio::spawn(async move { torrentleech::monitor(&leaked_config.torrentleech).await });
+    let tl_t: JoinHandle<Result<(), Error>> =
+        tokio::spawn(async move { 
+            loop {
+                info!("going to connect (monitor) in loop...");
+                match torrentleech::monitor(&leaked_config.torrentleech).await {
+                    Ok(_) => {
+                        error!("monitor resolved w/ Ok(), should be impossible!");
+                        return Ok(());
+                    },
+                    Err(e) => match e.downcast_ref::<irc::error::Error>() {
+                        Some(irc::error::Error::PingTimeout) => {
+                            error!("got a ping timeout! will try and reconnect")
+                        },
+                        Some(other) => {
+                            error!("Got some other IRC error: {:?}", other);
+                            return Err(e);
+                        }
+                        None => {
+                            error!("Got non-irc error: {:?}", e);
+                            return Err(e);
+                        }
+                    },
+                }
+            }
+         });
 
-    let ipt_t = tokio::spawn(async move { ipt_monitor(&leaked_config.ipt).await });
+    let ipt_t = tokio::spawn(async move { 
+        loop {
+            info!("going to connect (monitor) in loop...");
+            match ipt::ipt_monitor(&leaked_config.ipt).await {
+                Ok(_) => {
+                    error!("monitor resolved w/ Ok(), should be impossible!");
+                    return Ok(());
+                },
+                Err(e) => match e.downcast_ref::<irc::error::Error>() {
+                    Some(irc::error::Error::PingTimeout) => {
+                        error!("got a ping timeout! will try and reconnect")
+                    },
+                    Some(other) => {
+                        error!("Got some other IRC error: {:?}", other);
+                        return Err(e);
+                    }
+                    None => {
+                        error!("Got non-irc error: {:?}", e);
+                        return Err(e);
+                    }
+                },
+            }
+        }
+     });
 
     // We don't care about the result (should we?)
     let (torrentleech_join_result, ipt_join_result) = join!(tl_t, ipt_t);
