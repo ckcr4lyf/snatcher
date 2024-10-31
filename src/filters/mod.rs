@@ -1,4 +1,4 @@
-use log::debug;
+use log::{debug, info};
 use regex;
 
 use crate::trackers;
@@ -27,7 +27,7 @@ impl Filter {
             return false;
         }
 
-        debug!("All checks pass!");
+        info!("All checks passed for {}", torrent.name());
         return true;
     }
 }
