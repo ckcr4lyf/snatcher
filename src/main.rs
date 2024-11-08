@@ -65,7 +65,7 @@ async fn main() -> Result<(), failure::Error> {
     Ok(())
 }
 
-async fn monitor_wrapper<F, Fut, T: Sync>(monitor_fn: F, config: &'static T, tracker_name: &'static str) -> tokio::task::JoinHandle<Result<(), failure::Error>> 
+fn monitor_wrapper<F, Fut, T: Sync>(monitor_fn: F, config: &'static T, tracker_name: &'static str) -> tokio::task::JoinHandle<Result<(), failure::Error>> 
 where 
     F: Fn(&'static T) -> Fut + Send + 'static,
     Fut: Future<Output = Result<(), failure::Error>> + Send
