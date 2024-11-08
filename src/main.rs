@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{env, sync::Arc, time::Duration};
 
 use action::add_to_qbit;
 use failure::Error;
@@ -72,11 +72,12 @@ where
 {
     tokio::spawn(async move {
         loop {
-            info!("going to connect (monitor in loop...");
+            info!("going to connect (monitor) in loop...");
             match monitor_fn(config).await {
                 Ok(_) => {
                     error!("monitor resolved w/ Ok(), should be impossible!");
-                    return Ok(());
+                    // we will sleep for 60s and then reconnect
+                    tokio::time::sleep(Duration::from_millis(60000)).await;
                 },
                 Err(e) => match e.downcast_ref::<irc::error::Error>() {
                     Some(irc::error::Error::PingTimeout) => {
@@ -84,11 +85,13 @@ where
                     },
                     Some(other) => {
                         error!("Got some other IRC error: {:?}", other);
-                        return Err(e);
+                        // we will sleep for 60s and then reconnect
+                        tokio::time::sleep(Duration::from_millis(60000)).await;
                     }
                     None => {
                         error!("Got non-irc error: {:?}", e);
-                        return Err(e);
+                        // we will sleep for 60s and then reconnect
+                        tokio::time::sleep(Duration::from_millis(60000)).await;
                     }
                 },
             }
