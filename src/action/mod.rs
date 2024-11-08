@@ -1,6 +1,6 @@
 // TODO: maybe trait?
 
-use std::{ffi::OsStr, thread::JoinHandle, u16};
+use std::ffi::OsStr;
 
 use log::{debug, error, info, trace};
 
@@ -50,9 +50,3 @@ pub fn add_to_qbit_v2(path: &OsStr) {
         }
     }
 }
-
-
-// train MonitorFn {
-//     fn
-// }
-
