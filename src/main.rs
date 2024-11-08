@@ -55,36 +55,25 @@ async fn main() -> Result<(), failure::Error> {
 
     debug!("Got config as {:?}", &leaked_config);
 
-    let tl_t: JoinHandle<Result<(), Error>> =
-        tokio::spawn(async move { 
-            loop {
-                info!("going to connect (monitor) in loop...");
-                match torrentleech::monitor(&leaked_config.torrentleech).await {
-                    Ok(_) => {
-                        error!("monitor resolved w/ Ok(), should be impossible!");
-                        return Ok(());
-                    },
-                    Err(e) => match e.downcast_ref::<irc::error::Error>() {
-                        Some(irc::error::Error::PingTimeout) => {
-                            error!("got a ping timeout! will try and reconnect")
-                        },
-                        Some(other) => {
-                            error!("Got some other IRC error: {:?}", other);
-                            return Err(e);
-                        }
-                        None => {
-                            error!("Got non-irc error: {:?}", e);
-                            return Err(e);
-                        }
-                    },
-                }
-            }
-         });
+    let tl_t = monitor_wrapper(torrentleech::monitor, &leaked_config.torrentleech);
+    let ipt_t = monitor_wrapper(ipt::ipt_monitor, &leaked_config.ipt);
 
-    let ipt_t = tokio::spawn(async move { 
+    // We don't care about the result (should we?)
+    let (torrentleech_join_result, ipt_join_result) = join!(tl_t, ipt_t);
+    error!("We joined the threads, something went wrong!\nTorrentleech: {:?}\nIPT: {:?}", torrentleech_join_result, ipt_join_result);
+
+    Ok(())
+}
+
+async fn monitor_wrapper<F, Fut, T: Sync>(monitor_fn: F, config: &'static T) -> tokio::task::JoinHandle<Result<(), failure::Error>> 
+where 
+    F: Fn(&'static T) -> Fut + Send + 'static,
+    Fut: Future<Output = Result<(), failure::Error>> + Send
+{
+    tokio::spawn(async move {
         loop {
-            info!("going to connect (monitor) in loop...");
-            match ipt::ipt_monitor(&leaked_config.ipt).await {
+            info!("going to connect (monitor in loop...");
+            match monitor_fn(config).await {
                 Ok(_) => {
                     error!("monitor resolved w/ Ok(), should be impossible!");
                     return Ok(());
@@ -104,28 +93,5 @@ async fn main() -> Result<(), failure::Error> {
                 },
             }
         }
-     });
-
-    // We don't care about the result (should we?)
-    let (torrentleech_join_result, ipt_join_result) = join!(tl_t, ipt_t);
-    error!("We joined the threads, something went wrong!\nTorrentleech: {:?}\nIPT: {:?}", torrentleech_join_result, ipt_join_result);
-
-    monitor(yolo, 1).await;
-
-    Ok(())
-}
-
-async fn monitor<T>(monitor_fn: (impl Fn () -> (Result<(), failure::Error>) + Send + Sync + 'static), config: T) -> tokio::task::JoinHandle<Result<(), failure::Error>> {
-    tokio::spawn(async move {
-        loop {
-            info!("[]] going to connect (monitor in loop...");
-            monitor_fn();
-            return Ok(())
-        }
     })
-}
-
-
-fn yolo() -> Result<(), Error> {
-    return Ok(())
 }
