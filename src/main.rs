@@ -110,5 +110,22 @@ async fn main() -> Result<(), failure::Error> {
     let (torrentleech_join_result, ipt_join_result) = join!(tl_t, ipt_t);
     error!("We joined the threads, something went wrong!\nTorrentleech: {:?}\nIPT: {:?}", torrentleech_join_result, ipt_join_result);
 
+    monitor(yolo, 1).await;
+
     Ok(())
+}
+
+async fn monitor<T>(monitor_fn: (impl Fn () -> (Result<(), failure::Error>) + Send + Sync + 'static), config: T) -> tokio::task::JoinHandle<Result<(), failure::Error>> {
+    tokio::spawn(async move {
+        loop {
+            info!("[]] going to connect (monitor in loop...");
+            monitor_fn();
+            return Ok(())
+        }
+    })
+}
+
+
+fn yolo() -> Result<(), Error> {
+    return Ok(())
 }
