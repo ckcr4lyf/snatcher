@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{env, sync::Arc, time::Duration};
 
 use action::add_to_qbit;
 use failure::Error;
@@ -55,8 +55,8 @@ async fn main() -> Result<(), failure::Error> {
 
     debug!("Got config as {:?}", &leaked_config);
 
-    let tl_t = monitor_wrapper(torrentleech::monitor, &leaked_config.torrentleech);
-    let ipt_t = monitor_wrapper(ipt::ipt_monitor, &leaked_config.ipt);
+    let tl_t = tokio::spawn(async {monitor_wrapper(torrentleech::monitor, &leaked_config.torrentleech, "torrentleech").await});
+    let ipt_t = tokio::spawn(async {monitor_wrapper(ipt::ipt_monitor, &leaked_config.ipt, "iptorrents").await});
 
     // We don't care about the result (should we?)
     let (torrentleech_join_result, ipt_join_result) = join!(tl_t, ipt_t);
@@ -65,33 +65,34 @@ async fn main() -> Result<(), failure::Error> {
     Ok(())
 }
 
-async fn monitor_wrapper<F, Fut, T: Sync>(monitor_fn: F, config: &'static T) -> tokio::task::JoinHandle<Result<(), failure::Error>> 
+async fn monitor_wrapper<F, Fut, T>(monitor_fn: F, config: &'static T, tracker_name: &'static str) -> Result<(), failure::Error>
 where 
-    F: Fn(&'static T) -> Fut + Send + 'static,
-    Fut: Future<Output = Result<(), failure::Error>> + Send
+    F: Fn(&'static T) -> Fut,
+    Fut: Future<Output = Result<(), failure::Error>>
 {
-    tokio::spawn(async move {
-        loop {
-            info!("going to connect (monitor in loop...");
-            match monitor_fn(config).await {
-                Ok(_) => {
-                    error!("monitor resolved w/ Ok(), should be impossible!");
-                    return Ok(());
+    loop {
+        info!("[{}] going to connect (monitor) in loop...", tracker_name);
+        match monitor_fn(config).await {
+            Ok(_) => {
+                error!("monitor resolved w/ Ok(), should be impossible!");
+                // we will sleep for 60s and then reconnect
+                tokio::time::sleep(Duration::from_millis(60000)).await;
+            },
+            Err(e) => match e.downcast_ref::<irc::error::Error>() {
+                Some(irc::error::Error::PingTimeout) => {
+                    error!("got a ping timeout! will try and reconnect")
                 },
-                Err(e) => match e.downcast_ref::<irc::error::Error>() {
-                    Some(irc::error::Error::PingTimeout) => {
-                        error!("got a ping timeout! will try and reconnect")
-                    },
-                    Some(other) => {
-                        error!("Got some other IRC error: {:?}", other);
-                        return Err(e);
-                    }
-                    None => {
-                        error!("Got non-irc error: {:?}", e);
-                        return Err(e);
-                    }
-                },
-            }
+                Some(other) => {
+                    error!("Got some other IRC error: {:?}", other);
+                    // we will sleep for 60s and then reconnect
+                    tokio::time::sleep(Duration::from_millis(60000)).await;
+                }
+                None => {
+                    error!("Got non-irc error: {:?}", e);
+                    // we will sleep for 60s and then reconnect
+                    tokio::time::sleep(Duration::from_millis(60000)).await;
+                }
+            },
         }
-    })
+    }
 }
