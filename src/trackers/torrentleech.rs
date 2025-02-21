@@ -50,26 +50,11 @@ impl super::Torrent for TorrentleechTorrent {
 async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> {
     trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
 
-    let name_start_index = msg.find("Name:'")?;
-    let name_end_index = msg.find("' uploaded by '")?;
-    let (uploader_end_index, freeleech, lenn) = match msg.find("' - ") {
-        Some(pos) => (pos, false, 11),
-        None => match msg.find("' freeleech - ") {
-            Some(pos) => (pos, true, 21),
-            None => return None,
-        },
-    };
-
-    let name_original: String = msg[name_start_index + 6..name_end_index].to_owned();
-    let name_dot = name_original.replace(" ", ".");
-    let url: String = msg[uploader_end_index + lenn..].to_owned();
-
-    let id_index = url.rfind("/")?;
-    let id: String = url[id_index + 1..].to_owned();
+    let message_fields = parse_fields_from_msg(msg)?;
 
     let download_url = format!(
         "https://www.torrentleech.org/rss/download/{}/{}/{}.torrent",
-        id, rss_key, name_dot
+        message_fields.id, rss_key, message_fields.name_dot,
     );
 
     trace!("Going to download torrent from {}", download_url);
@@ -100,11 +85,11 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
     };
 
     return Some(TorrentleechTorrent {
-        name: name_dot,
-        uploader: msg[name_end_index + 15..uploader_end_index].to_owned(),
-        url,
-        freeleech,
-        id,
+        name: message_fields.name_dot,
+        uploader: message_fields.uploader,
+        url: message_fields.url,
+        freeleech: message_fields.freeleech,
+        id: message_fields.id,
         raw_torrent: bytes.to_vec(),
         // path: p.into(),
         size: t.size(),
@@ -183,4 +168,84 @@ pub async fn monitor(tracker_config: &'static TorrentleechConfig) -> Result<(), 
     }
 
     Ok(())
+}
+
+#[derive(PartialEq, Eq, Debug)]
+struct MessagedParsedFields {
+    name_dot: String,
+    uploader: String,
+    id: String,
+    url: String,
+    freeleech: bool,
+}
+
+fn parse_fields_from_msg(msg: &str) -> Option<MessagedParsedFields> {
+    let name_start_index = msg.find("Name:'")?;
+    let name_end_index = msg.find("' uploaded by '")?;
+
+    // lenn is number of characters after uploader end before the URL
+    let (uploader_end_index, freeleech, lenn) = match msg.rfind("' - ") {
+        Some(pos) => (pos, false, 10),
+        None => match msg.find("' freeleech - ") {
+            Some(pos) => (pos, true, 20),
+            None => return None,
+        },
+    };
+
+    let name_original: String = msg[name_start_index + 6..name_end_index].to_owned();
+    let name_dot = name_original.replace(" ", ".");
+    let url: String = msg[uploader_end_index + lenn..].to_owned();
+
+    let id_index = url.rfind("/")?;
+    let id: String = url[id_index + 1..].to_owned();
+
+    return Some(MessagedParsedFields{
+        name_dot: name_dot,
+        uploader: msg[name_end_index + 15..uploader_end_index].to_owned(),
+        id: id,
+        url: url,
+        freeleech: freeleech,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::trackers::torrentleech::*;
+
+
+    #[test]
+    fn test_parse_freeleech(){
+        let mock_message = "00,04New Torrent Announcement:00,12 <Movies :: Bluray>  Name:'A Kid Like Jake 2018 1080p BluRay REMUX AVC DTS-HD MA 5 1-PiRAMiDHEAD' uploaded by 'Wardaddy007' freeleech - 01,15 https://www.torrentleech.org/torrent/241304583";
+        assert_eq!(parse_fields_from_msg(mock_message), Some(MessagedParsedFields{
+            name_dot: "A.Kid.Like.Jake.2018.1080p.BluRay.REMUX.AVC.DTS-HD.MA.5.1-PiRAMiDHEAD".to_string(),
+            uploader: "Wardaddy007".to_string(),
+            id: "241304583".to_string(),
+            url: "https://www.torrentleech.org/torrent/241304583".to_string(),
+            freeleech: true
+        }))
+    }
+
+    #[test]
+    fn test_parse_normal(){
+        let mock_message = "00,04New Torrent Announcement:00,12 <TV :: Episodes HD>  Name:'The Kardashians S05E06 1080p WEB h264-ETHEL' uploaded by 'Anonymous' - 01,15 https://www.torrentleech.org/torrent/241304584";
+        assert_eq!(parse_fields_from_msg(mock_message), Some(MessagedParsedFields{
+            name_dot: "The.Kardashians.S05E06.1080p.WEB.h264-ETHEL".to_string(),
+            uploader: "Anonymous".to_string(),
+            id: "241304584".to_string(),
+            url: "https://www.torrentleech.org/torrent/241304584".to_string(),
+            freeleech: false
+        }))
+    }
+
+    #[test]
+    fn test_parse_dodgy_japanese(){
+        let mock_message = "00,04New Torrent Announcement:00,12 <Music :: Audio>  Name:' - 華昇リ (2020, FLAC) [BeesKnees]' uploaded by 'lukemattle' - 01,15 https://www.torrentleech.org/torrent/241452475";
+        assert_eq!(parse_fields_from_msg(mock_message), Some(MessagedParsedFields{
+            name_dot: ".-.華昇リ.(2020,.FLAC).[BeesKnees]".to_string(),
+            uploader: "lukemattle".to_string(),
+            id: "241452475".to_string(),
+            url: "https://www.torrentleech.org/torrent/241452475".to_string(),
+            freeleech: false
+        }))
+    }
 }
