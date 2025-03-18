@@ -39,11 +39,15 @@ pub fn add_to_qbit_v2(path: &OsStr) {
         .output()
     {
         Ok(output) => {
-            info!("Added {:?} to qbittorrent", path);
-            debug!(
-                "Added to qbittorrent: {}",
-                String::from_utf8_lossy(&output.stdout)
-            );
+            if output.status.success() {
+                info!("Added {:?} to qbittorrent", path);
+                debug!(
+                    "Added to qbittorrent: {}",
+                    String::from_utf8_lossy(&output.stdout)
+                );
+            } else {
+                error!("Failed to add. Program return non-zero exit status: {:?}\nstderr: {}", output.status.code(), String::from_utf8_lossy(&output.stderr));
+            }
         }
         Err(e) => {
             error!("Failed to add: {}", e);
