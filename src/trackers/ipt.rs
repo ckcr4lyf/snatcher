@@ -1,4 +1,4 @@
-use std::{env::temp_dir, fmt::format, io::Write, sync::Arc};
+use std::{env::temp_dir, io::Write};
 
 use futures::StreamExt;
 use irc::{

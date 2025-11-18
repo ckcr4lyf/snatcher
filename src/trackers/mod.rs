@@ -1,6 +1,5 @@
 use std::{
     ffi::{OsStr, OsString},
-    sync::Arc,
 };
 
 use crate::filters;

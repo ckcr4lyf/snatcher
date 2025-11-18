@@ -1,15 +1,12 @@
-use std::{env, sync::Arc, time::Duration};
+use std::{time::Duration};
 
-use failure::Error;
 use futures::prelude::*;
-use irc::client::prelude::*;
 
 mod trackers;
 use log::{debug, error, info};
-use regex::RegexSet;
 use serde::{Deserialize, Serialize};
-use tokio::{join, task::JoinHandle};
-use trackers::{ipt, torrentleech, Torrent, Tracker};
+use tokio::{join};
+use trackers::{ipt, torrentleech};
 mod action;
 mod filters;
 mod torrent;

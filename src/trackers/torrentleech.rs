@@ -2,7 +2,6 @@ use std::{
     env::temp_dir,
     ffi::{OsStr, OsString},
     io::Write,
-    sync::Arc,
 };
 
 use futures::StreamExt;
@@ -16,7 +15,6 @@ use serde_bencode::de;
 use crate::{
     action::add_to_qbit_v2,
     filters, torrent,
-    trackers::Torrent,
     TorrentleechConfig,
 };
 
