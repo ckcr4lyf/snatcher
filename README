@@ -26,3 +26,19 @@ Configuration
 --- 
 
 TODO
+
+
+Running
+---
+
+Logging is configured via `RUST_LOG` and is to `stderr`.
+
+```
+export RUST_LOG=snatcher=TRACE
+```
+
+`snatcher` can be run on the CLI with logs redirected to a file:
+
+```
+snatcher 2>/tmp/snatcher.log
+```

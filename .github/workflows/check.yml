@@ -1,0 +1,14 @@
+name: rust check
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    name: cargo check
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D unused_imports"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo check
