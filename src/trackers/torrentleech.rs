@@ -14,7 +14,7 @@ use log::{debug, error, info, trace};
 use serde_bencode::de;
 
 use crate::{
-    action::{add_to_qbit, add_to_qbit_v2},
+    action::add_to_qbit_v2,
     filters, torrent,
     trackers::Torrent,
     TorrentleechConfig,

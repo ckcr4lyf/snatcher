@@ -8,7 +8,7 @@ use irc::{
 use log::{debug, error, info, trace};
 
 use crate::{
-    action::{add_to_qbit, add_to_qbit_v2},
+    action::add_to_qbit_v2,
     filters, IptConfig,
 };
 #[derive(Debug, Clone)]

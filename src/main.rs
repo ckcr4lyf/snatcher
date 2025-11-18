@@ -1,6 +1,5 @@
 use std::{env, sync::Arc, time::Duration};
 
-use action::add_to_qbit;
 use failure::Error;
 use futures::prelude::*;
 use irc::client::prelude::*;
