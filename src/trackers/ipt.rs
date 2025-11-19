@@ -71,10 +71,16 @@ async fn parse_message(msg: &str) -> Option<IptTorrent> {
     })
 }
 
+#[derive(Debug)]
+enum IptError {
+    HttpError,
+    FilesystemError,
+}
+
 async fn download_torrent(
     passkey: &str,
     torrent: &IptTorrent,
-) -> Result<std::ffi::OsString, failure::Error> {
+) -> Result<std::ffi::OsString, IptError> {
     let download_url = format!(
         "https://iptorrents.com/download.php/{}/{}.torrent?torrent_pass={}",
         torrent.id, torrent.name, passkey
@@ -87,12 +93,18 @@ async fn download_torrent(
         Ok(v) => v,
         Err(e) => {
             error!("Got error from HTTP request: {}", e);
-            return Err(e.into());
+            return Err(IptError::HttpError);
         }
     };
 
     trace!("Got HTTP {} from IPT", response.status());
-    let bytes = response.bytes().await.unwrap();
+    let bytes = match response.bytes().await {
+        Ok(v) => v,
+        Err(e) => {
+            error!("Got error from HTTP request: {}", e);
+            return Err(IptError::HttpError);
+        }
+    };
 
     // No need to bencode-decode here...
     let filename = format!("{}.torrent", torrent.name);
@@ -106,7 +118,7 @@ async fn download_torrent(
         }
         Err(e) => {
             error!("fail to write to file; {}", e);
-            return Err(e.into());
+            return Err(IptError::FilesystemError);
         }
     }
 }
@@ -149,7 +161,7 @@ pub async fn ipt_monitor(tracker_config: &'static IptConfig) -> Result<(), failu
                                     add_to_qbit_v2(&p);
                                 }
                                 Err(e) => {
-                                    error!("Failed to download: {}", e)
+                                    error!("Failed to download: {:?}", e)
                                 }
                             }
                         } else {
