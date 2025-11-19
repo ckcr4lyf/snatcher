@@ -45,10 +45,21 @@ impl super::Torrent for TorrentleechTorrent {
     }
 }
 
-async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> {
+#[derive(Debug)]
+enum TorrentleechError {
+    HttpError,
+    BencodeError,
+    FilesystemError,
+    ParseError,
+}
+
+async fn parse_message(rss_key: &str, msg: &str) -> Result<TorrentleechTorrent, TorrentleechError> {
     trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
 
-    let message_fields = parse_fields_from_msg(msg)?;
+    let message_fields = match parse_fields_from_msg(msg) {
+        Some(v) => v,
+        None => return Err(TorrentleechError::ParseError),
+    };
 
     let download_url = format!(
         "https://www.torrentleech.org/rss/download/{}/{}/{}.torrent",
@@ -62,12 +73,18 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
         Ok(v) => v,
         Err(e) => {
             error!("Got error from HTTP request: {}", e);
-            return None;
+            return Err(TorrentleechError::HttpError);
         }
     };
 
     trace!("Got HTTP {} from TL", response.status());
-    let bytes = response.bytes().await.unwrap();
+    let bytes = match response.bytes().await {
+        Ok(v) => v,
+        Err(e) => {
+            error!("Got error from HTTP request: {}", e);
+            return Err(TorrentleechError::HttpError);
+        }
+    };
 
     // Try and parse torrent
     trace!("Going to bencode-decode torrent");
@@ -78,11 +95,11 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
         }
         Err(e) => {
             error!("Error bencode-decoding torrent: {}", e);
-            return None;
+            return Err(TorrentleechError::BencodeError);
         }
     };
 
-    return Some(TorrentleechTorrent {
+    return Ok(TorrentleechTorrent {
         name: message_fields.name_dot,
         uploader: message_fields.uploader,
         url: message_fields.url,
@@ -94,7 +111,7 @@ async fn parse_message(rss_key: &str, msg: &str) -> Option<TorrentleechTorrent> 
     });
 }
 
-async fn download_torrent(torrent: &TorrentleechTorrent) -> Result<OsString, failure::Error> {
+async fn download_torrent(torrent: &TorrentleechTorrent) -> Result<OsString, TorrentleechError> {
     let filename = format!("{}.torrent", &torrent.name);
     let p = temp_dir().as_path().join(&filename);
     let mut f = std::fs::File::create(&p).unwrap();
@@ -106,7 +123,7 @@ async fn download_torrent(torrent: &TorrentleechTorrent) -> Result<OsString, fai
         }
         Err(e) => {
             error!("fail to write to file; {}", e);
-            return Err(e.into());
+            return Err(TorrentleechError::FilesystemError);
         }
     }
 }
@@ -136,7 +153,7 @@ pub async fn monitor(tracker_config: &'static TorrentleechConfig) -> Result<(), 
             match message.command {
                 Command::PRIVMSG(_, p2) => {
                     let x = parse_message(&tracker_config.rss_key, &p2).await;
-                    if let Some(x) = x {
+                    if let Ok(x) = x {
                         debug!("Got new release: {} (Size: {})", x.name, x.size);
 
                         if filter.check(&x) == true {
@@ -148,14 +165,14 @@ pub async fn monitor(tracker_config: &'static TorrentleechConfig) -> Result<(), 
                                     add_to_qbit_v2(&p);
                                 }
                                 Err(e) => {
-                                    error!("Failed to download: {}", e)
+                                    error!("Failed to download: {:?}", e)
                                 }
                             }
                         } else {
                             debug!("Did not pass filter")
                         }
                     } else {
-                        error!("Filed to parse message: {}", p2);
+                        error!("Failed to parse message: {}", p2);
                     }
                 }
                 _ => {
