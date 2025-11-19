@@ -50,12 +50,16 @@ enum TorrentleechError {
     HttpError,
     BencodeError,
     FilesystemError,
+    ParseError,
 }
 
 async fn parse_message(rss_key: &str, msg: &str) -> Result<TorrentleechTorrent, TorrentleechError> {
     trace!("parse_message for {} ({:2X?})", msg, msg.as_bytes());
 
-    let message_fields = parse_fields_from_msg(msg)?;
+    let message_fields = match parse_fields_from_msg(msg) {
+        Some(v) => v,
+        None => return Err(TorrentleechError::ParseError),
+    };
 
     let download_url = format!(
         "https://www.torrentleech.org/rss/download/{}/{}/{}.torrent",
