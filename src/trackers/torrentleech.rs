@@ -51,6 +51,7 @@ enum TorrentleechError {
     BencodeError,
     FilesystemError,
     ParseError,
+    TorrentNotFound,
 }
 
 async fn parse_message(rss_key: &str, msg: &str) -> Result<TorrentleechTorrent, TorrentleechError> {
@@ -78,6 +79,11 @@ async fn parse_message(rss_key: &str, msg: &str) -> Result<TorrentleechTorrent, 
     };
 
     trace!("Got HTTP {} from TL", response.status());
+    // If HTTP 404, then we don't have the torrent...
+    if response.status() == 404 {
+        return Err(TorrentleechError::TorrentNotFound);
+    }
+
     let bytes = match response.bytes().await {
         Ok(v) => v,
         Err(e) => {
@@ -208,7 +214,7 @@ fn parse_fields_from_msg(msg: &str) -> Option<MessagedParsedFields> {
     };
 
     let name_original: String = msg[name_start_index + 6..name_end_index].to_owned();
-    let name_dot = name_original.replace(" ", ".");
+    let name_dot = name_original.replace(" ", ".").replace("#", ""); // Replace space w/ '.' , remove '#' (TBD if more rules for TL)
     let url: String = msg[uploader_end_index + lenn..].to_owned();
 
     let id_index = url.rfind("/")?;
