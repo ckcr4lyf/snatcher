@@ -29,7 +29,7 @@ impl super::Torrent for IptTorrent {
     }
 
     fn size(&self) -> i64 {
-        let parts: Vec<&str> = self.size.split(" ").collect();
+        let parts: Vec<&str> = self.size.split_whitespace().collect();
         trace!("Got parts as {:?}", parts);
 
         let float_part: f32 = parts[0].parse::<f32>().unwrap();
